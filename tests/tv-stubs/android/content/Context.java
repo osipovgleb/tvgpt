@@ -5,6 +5,12 @@ public class Context {
 
   public Context() {}
 
+  public android.content.pm.ApplicationInfo getApplicationInfo() {
+    android.content.pm.ApplicationInfo info = new android.content.pm.ApplicationInfo();
+    info.sourceDir = "/test/tvgpt.apk";
+    return info;
+  }
+
   public Object getSystemService(String name) {
     return audio;
   }

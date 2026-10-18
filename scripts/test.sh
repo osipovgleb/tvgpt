@@ -22,9 +22,10 @@ for test in ProtocolTest LiveProtocolTest WakePhraseTest AdbWireTest Conversatio
  "$TVGPT_JAVA/java" -cp build/test:build/deps/json-test.jar "local.tvgpt.assistant.$test"
 done
 
-"$TVGPT_JAVA/javac" -cp build/deps/json-test.jar -d build/test app/src/local/tvgpt/assistant/{CancellationToken,ActionWait,ActionObservation,AudioFocusLease,PlaybackObservation,MediaSessionControl,RemoteSequence}.java tests/{ActionWaitTest,ActionObservationTest,AudioFocusLeaseTest,PlaybackObservationTest,MediaSessionControlTest,RemoteSequenceTest}.java
+"$TVGPT_JAVA/javac" -cp build/deps/json-test.jar -d build/test app/src/local/tvgpt/assistant/{CancellationToken,ActionWait,ActionObservation,AudioFocusLease,PlaybackObservation,MediaSessionControl,RemoteSequence,CecAudioStatus,VolumeRemote}.java tests/{ActionWaitTest,ActionObservationTest,AudioFocusLeaseTest,PlaybackObservationTest,MediaSessionControlTest,RemoteSequenceTest,VolumeRemoteTest}.java
 "$TVGPT_JAVA/java" -cp build/test:build/deps/json-test.jar local.tvgpt.assistant.ActionWaitTest
 "$TVGPT_JAVA/java" -cp build/test:build/deps/json-test.jar local.tvgpt.assistant.ActionObservationTest
+"$TVGPT_JAVA/java" -cp build/test:build/deps/json-test.jar local.tvgpt.assistant.VolumeRemoteTest
 
 "$TVGPT_JAVA/java" -cp build/test local.tvgpt.assistant.AudioFocusLeaseTest
 "$TVGPT_JAVA/java" -cp build/test local.tvgpt.assistant.PlaybackObservationTest

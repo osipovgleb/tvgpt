@@ -80,3 +80,24 @@ The existing assistant handover and `scripts/connect-tv.py` now query these two 
 Successful readback and immediate invocation do not prove reboot persistence or immunity to future OEM kills. Observe idle/background operation and inspect `dumpsys activity exit-info local.tvgpt.assistant` before declaring long-term recovery verified.
 
 TCL Guard can still kill an allowed-to-start app. Its documented TGuardService --ma mKillWhiteList operation appends this package to the current runtime exemption list without changing other entries. Assistant setup queries support/membership and verifies the addition. AssistantService also makes one bounded background attempt per process start, using the existing paired local ADB connection. This list is not claimed permanent across Guard/TV restarts. If accessibility's window token is unavailable after rebind, the assistant catches BadTokenException, clears the failed overlay and uses its existing native system voice window. onUnbind invalidates the cached accessibility instance.
+
+### Volume target and external audio
+
+Relative volume commands probe Android's current HDMI System Audio mode through a short-lived,
+allowlisted shell helper using the app's own paired local ADB connection. An active CEC audio system
+(logical address 5) receives a relative `setSystemAudioVolume` command. No device manufacturer,
+external bridge package, ARC switch, optical route change, root, or persistent worker is required.
+An explicit inactive system-audio result retains the normal Android stream path. An unknown route
+or uncertain dispatch never falls back to a second volume mutation. This path requires local pairing;
+other transports (including IR-only remotes) are not implemented.
+
+External success requires a fresh CEC Report Audio Status with a volume change in the requested
+direction. Stale/missing reports, unknown CEC volume and unchanged boundaries remain unconfirmed;
+Android STREAM_MUSIC readback is not evidence of external amplifier volume. OEM dumpsys formatting
+can vary; unsupported readback must remain unconfirmed rather than inventing a successful result.
+The relative tool does not offer an external absolute-percent setting.
+
+Device check on 18 October: common helper, without manufacturer matching, observed external
+27→30→27; injected Android KEYCODE_VOLUME_UP produced no new CEC packet on this TCL. The physical
+remote's existing raw-input bridge was left unchanged. This confirms the external backend here,
+not compatibility with every TV or IR-controlled audio system.
