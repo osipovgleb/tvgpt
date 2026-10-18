@@ -35,7 +35,27 @@ public final class WakeDetectorRecoveryTest {
       Thread.sleep(650);
       if (AudioRecord.created.get() != 4)
         throw new AssertionError("close must cancel delayed retry");
-      System.out.println("WakeDetectorRecoveryTest passed");
+      AudioRecord.fail = false;
+      java.util.concurrent.atomic.AtomicInteger wakes =
+          new java.util.concurrent.atomic.AtomicInteger();
+      WakeDetector speech = new WakeDetector(new Context(files.toFile()), wakes::incrementAndGet);
+      try {
+        speech.start();
+        org.vosk.Recognizer.frames.add("P{\"partial\":\"привет телевизор\"}");
+        await(() -> org.vosk.Recognizer.processed.get() >= 1);
+        Thread.sleep(100);
+        if (wakes.get() != 0) throw new AssertionError("Unstable partial opened Live");
+        org.vosk.Recognizer.frames.add("F{\"text\":\"[unk]\"}");
+        await(() -> org.vosk.Recognizer.processed.get() >= 2);
+        if (wakes.get() != 0) throw new AssertionError("Corrected hypothesis opened Live");
+        org.vosk.Recognizer.frames.add("F{\"text\":\"привет телевизор\"}");
+        await(() -> wakes.get() == 1);
+        Thread.sleep(100);
+        if (wakes.get() != 1) throw new AssertionError("Final phrase dispatched twice");
+      } finally {
+        speech.close();
+      }
+      System.out.println("WakeDetectorRecoveryTest passed: recovery and final-only invocation");
     } finally {
       detector.close();
       Files.delete(files.resolve("wake-ru-0.22/ready"));

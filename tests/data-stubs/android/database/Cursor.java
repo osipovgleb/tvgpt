@@ -40,6 +40,14 @@ public final class Cursor implements AutoCloseable {
     return v == JSONObject.NULL ? null : String.valueOf(v);
   }
 
+  public boolean isNull(int column) {
+    return rows.getJSONArray(at).isNull(column);
+  }
+
+  public int getInt(int column) {
+    return rows.getJSONArray(at).getInt(column);
+  }
+
   public long getLong(int column) {
     return rows.getJSONArray(at).getLong(column);
   }

@@ -22,9 +22,10 @@ for test in ProtocolTest LiveProtocolTest WakePhraseTest AdbWireTest Conversatio
  "$TVGPT_JAVA/java" -cp build/test:build/deps/json-test.jar "local.tvgpt.assistant.$test"
 done
 
-"$TVGPT_JAVA/javac" -cp build/deps/json-test.jar -d build/test app/src/local/tvgpt/assistant/{CancellationToken,ActionWait,ActionObservation,AudioFocusLease,PlaybackObservation,MediaSessionControl,RemoteSequence}.java tests/{ActionWaitTest,ActionObservationTest,AudioFocusLeaseTest,PlaybackObservationTest,MediaSessionControlTest,RemoteSequenceTest}.java
+"$TVGPT_JAVA/javac" -cp build/deps/json-test.jar -d build/test app/src/local/tvgpt/assistant/{CancellationToken,ActionWait,ActionObservation,AudioFocusLease,PlaybackObservation,MediaSessionControl,RemoteSequence,CecAudioStatus,VolumeRemote}.java tests/{ActionWaitTest,ActionObservationTest,AudioFocusLeaseTest,PlaybackObservationTest,MediaSessionControlTest,RemoteSequenceTest,VolumeRemoteTest}.java
 "$TVGPT_JAVA/java" -cp build/test:build/deps/json-test.jar local.tvgpt.assistant.ActionWaitTest
 "$TVGPT_JAVA/java" -cp build/test:build/deps/json-test.jar local.tvgpt.assistant.ActionObservationTest
+"$TVGPT_JAVA/java" -cp build/test:build/deps/json-test.jar local.tvgpt.assistant.VolumeRemoteTest
 
 "$TVGPT_JAVA/java" -cp build/test local.tvgpt.assistant.AudioFocusLeaseTest
 "$TVGPT_JAVA/java" -cp build/test local.tvgpt.assistant.PlaybackObservationTest
@@ -105,9 +106,10 @@ for test in CancellationTokenTest CallContextTest TaskHarnessTest TaskEvidenceTe
  "$TVGPT_JAVA/java" -cp build/test:build/deps/json-test.jar "local.tvgpt.assistant.$test"
 done
 bash scripts/test-data-repair.sh
+bash scripts/test-reminder-tools.sh
 bash scripts/test-tv-actions.sh
 "$TVGPT_JAVA/javac" -cp "$TVGPT_TOOLCHAIN/android-35/android.jar:build/deps/json-test.jar" -d build/wake-test $(find tests/wake-stubs -name '*.java') app/src/local/tvgpt/assistant/{WakeDetector,WakeRecovery,WakePhrase}.java tests/WakeDetectorRecoveryTest.java
-"$TVGPT_JAVA/java" -cp "build/wake-test:$TVGPT_TOOLCHAIN/android-35/android.jar:build/deps/json-test.jar" local.tvgpt.assistant.WakeDetectorRecoveryTest
+"$TVGPT_JAVA/java" -cp "build/wake-test:build/deps/json-test.jar:$TVGPT_TOOLCHAIN/android-35/android.jar" local.tvgpt.assistant.WakeDetectorRecoveryTest
 
 bash scripts/test-digest-cancellation.sh
 

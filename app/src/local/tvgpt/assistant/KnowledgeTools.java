@@ -21,19 +21,24 @@ final class KnowledgeTools {
         return repo.read(args.getLong("id"), args.optInt("offset"), args.optInt("limit", 2000))
             .toString();
       case "knowledge_save":
-        return new JSONObject()
-            .put(
-                "saved_id",
-                repo.save(
-                    args.optLong("id"),
-                    args.optLong("revision"),
-                    args.getString("title"),
-                    args.getString("text"),
-                    "voice",
-                    token));
+        {
+          long id =
+              repo.save(
+                  args.optLong("id"),
+                  args.optLong("revision"),
+                  args.getString("title"),
+                  args.getString("text"),
+                  "voice",
+                  token);
+          AppDataEvents.changed(c, AppDataEvents.KNOWLEDGE);
+          return new JSONObject().put("saved_id", id);
+        }
       case "knowledge_delete":
-        return new JSONObject()
-            .put("deleted", repo.delete(args.getLong("id"), args.getLong("revision"), token));
+        {
+          boolean deleted = repo.delete(args.getLong("id"), args.getLong("revision"), token);
+          if (deleted) AppDataEvents.changed(c, AppDataEvents.KNOWLEDGE);
+          return new JSONObject().put("deleted", deleted);
+        }
       default:
         throw new IllegalArgumentException("Unknown knowledge tool");
     }

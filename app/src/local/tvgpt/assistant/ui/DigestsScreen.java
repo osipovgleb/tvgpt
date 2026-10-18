@@ -26,6 +26,7 @@ public final class DigestsScreen extends AsyncScreen {
   public DigestsScreen(Context c, String id) {
     super(c, "");
     selected = id == null ? "" : id;
+    observeData(AppDataEvents.DIGESTS, this::refresh);
     refresh();
   }
 
@@ -48,31 +49,13 @@ public final class DigestsScreen extends AsyncScreen {
     JSONObject chosen = result.optJSONObject("selected");
     JSONArray digests = result.optJSONArray("items");
     if (chosen == null) {
-      selected = "";
-      body.addView(
-          Screens.button(
-              getContext(),
-              "Создать подборку",
-              () -> DigestSheet.open(getContext(), "digest", "", this::refresh)));
-      if (digests != null)
-        for (int i = 0; i < digests.length(); i++) {
-          JSONObject d = digests.optJSONObject(i);
-          body.addView(
-              Screens.button(
-                  getContext(),
-                  d.optString("title"),
-                  () -> {
-                    selected = d.optString("id");
-                    refresh();
-                  }));
-        }
-      body.addView(
-          Screens.button(getContext(), "Выбрать новостную заставку", this::chooseScreensaver));
+      renderDigestList(digests);
       return;
     }
     body.addView(
-        Screens.button(
+        Screens.action(
             getContext(),
+            SettingsGlyph.BACK,
             "Все подборки",
             () -> {
               selected = "";
@@ -86,7 +69,7 @@ public final class DigestsScreen extends AsyncScreen {
         chosen.optString("title"),
         chosen.optString("topics"),
         () -> DigestSheet.open(getContext(), "digest", selected, this::refresh));
-    rows.row(group, SettingsGlyph.BOOK, "Источники", "Сайты и RSS", () -> manage("source"));
+    rows.row(group, SettingsGlyph.LINK, "Источники", "Сайты и RSS", () -> manage("source"));
     rows.row(
         group,
         SettingsGlyph.CLOCK,
@@ -95,13 +78,13 @@ public final class DigestsScreen extends AsyncScreen {
         () -> manage("schedule"));
     rows.row(
         group,
-        SettingsGlyph.SETTINGS,
+        SettingsGlyph.REFRESH,
         "Обновить сейчас",
         jobLabel(result.optJSONObject("job")),
         () -> update());
     rows.row(
         group,
-        SettingsGlyph.PALETTE,
+        SettingsGlyph.PLAY,
         "Посмотреть на весь экран",
         "",
         () ->
@@ -124,6 +107,38 @@ public final class DigestsScreen extends AsyncScreen {
         card.setOnClickListener(v -> article(a));
         body.addView(card);
       }
+  }
+
+  private void renderDigestList(JSONArray digests) {
+    selected = "";
+    body.addView(
+        Screens.action(
+            getContext(),
+            SettingsGlyph.PLUS,
+            "Создать подборку",
+            () -> DigestSheet.open(getContext(), "digest", "", this::refresh)));
+    if (digests != null)
+      for (int i = 0; i < digests.length(); i++) {
+        JSONObject d = digests.optJSONObject(i);
+        body.addView(
+            new LibraryCard(
+                    getContext(),
+                    SettingsGlyph.NEWS,
+                    d.optString("title"),
+                    d.optString("topics"),
+                    "",
+                    () -> {
+                      selected = d.optString("id");
+                      refresh();
+                    })
+                .withKey("digest:" + d.optString("id")));
+      }
+    body.addView(
+        Screens.action(
+            getContext(),
+            SettingsGlyph.PALETTE,
+            "Выбрать новостную заставку",
+            this::chooseScreensaver));
   }
 
   private String jobLabel(JSONObject job) {
@@ -170,9 +185,14 @@ public final class DigestsScreen extends AsyncScreen {
             labels[i + 1] =
                 kind.equals("source") ? a.optString("title", a.optString("url")) : scheduleLabel(a);
           }
+          int[] icons = new int[labels.length];
+          java.util.Arrays.fill(
+              icons, kind.equals("source") ? SettingsGlyph.LINK : SettingsGlyph.CLOCK);
+          icons[0] = SettingsGlyph.PLUS;
           new RightSheet.Builder(getContext())
-              .setItems(
+              .setIconItems(
                   labels,
+                  icons,
                   (dialog, index) ->
                       DigestSheet.open(
                           getContext(),
@@ -215,8 +235,9 @@ public final class DigestsScreen extends AsyncScreen {
       for (int i = 0; i < sources.length(); i++) {
         JSONObject s = sources.optJSONObject(i);
         box.addView(
-            Screens.button(
+            Screens.action(
                 getContext(),
+                SettingsGlyph.LINK,
                 s.optString("title", s.optString("url")),
                 () -> {
                   try {

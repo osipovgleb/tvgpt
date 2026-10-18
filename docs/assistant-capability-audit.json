@@ -1,0 +1,490 @@
+{
+  "audited_at": "2026-10-18",
+  "source_commit": "0083d89",
+  "scope": "Все шесть разделов TV GPT и их вложенные редакторы; не все меню сторонних приложений.",
+  "method": "Каталог извлечён вызовом настоящего AgentTools.all из собранных классов, без AgentFakes. Проверены схемы, маршрутизатор, репозитории и UI callbacks. Аудит кода не является испытанием всех голосовых команд на ТВ.",
+  "catalog_entries": 46,
+  "function_tools": 45,
+  "states": {
+    "direct": "Есть отдельный типизированный инструмент и маршрут исполнения.",
+    "missing": "Нет прямой команды для действия, уже доступного UI/репозиторию.",
+    "ui_only": "Можно пытаться через общие read_screen/click/navigate; нет отдельной семантической операции.",
+    "system_ui": "Системный экран; его открытие не доказывает изменение системной настройки.",
+    "setup_ui": "Настройка аккаунта/доступов остаётся в UI; голосовой маршрут не реализован."
+  },
+  "actions": [
+    {
+      "section": "Разговоры",
+      "action": "Поиск и список сохранённых бесед",
+      "state": "direct",
+      "tools": [
+        "conversation_search"
+      ],
+      "source": "app/src/local/tvgpt/assistant/ui/ConversationsScreen.java",
+      "detail": ""
+    },
+    {
+      "section": "Разговоры",
+      "action": "Чтение и следующие страницы",
+      "state": "direct",
+      "tools": [
+        "conversation_read"
+      ],
+      "source": "app/src/local/tvgpt/assistant/ui/ConversationsScreen.java",
+      "detail": ""
+    },
+    {
+      "section": "Разговоры",
+      "action": "Удаление сохранённой беседы",
+      "state": "direct",
+      "tools": [
+        "conversation_delete"
+      ],
+      "source": "app/src/local/tvgpt/assistant/ui/ConversationsScreen.java",
+      "detail": ""
+    },
+    {
+      "section": "Разговоры",
+      "action": "Повторить создание описания",
+      "state": "missing",
+      "tools": [],
+      "source": "app/src/local/tvgpt/assistant/ui/ConversationsScreen.java",
+      "detail": "Кнопка вызывает ConversationSummarizer.request, инструмента нет."
+    },
+    {
+      "section": "Разговоры",
+      "action": "Открыть выбранную беседу на экране",
+      "state": "ui_only",
+      "tools": [],
+      "source": "app/src/local/tvgpt/assistant/ui/ConversationsScreen.java",
+      "detail": "Чтение данных доступно, прямого маршрута к экрану выбранного разговора нет."
+    },
+    {
+      "section": "Общие знания",
+      "action": "Список и чтение заметок",
+      "state": "direct",
+      "tools": [
+        "knowledge_list",
+        "knowledge_read"
+      ],
+      "source": "app/src/local/tvgpt/assistant/KnowledgeTools.java",
+      "detail": ""
+    },
+    {
+      "section": "Общие знания",
+      "action": "Создание и изменение заметки",
+      "state": "direct",
+      "tools": [
+        "knowledge_save"
+      ],
+      "source": "app/src/local/tvgpt/assistant/KnowledgeTools.java",
+      "detail": ""
+    },
+    {
+      "section": "Общие знания",
+      "action": "Удаление заметки",
+      "state": "direct",
+      "tools": [
+        "knowledge_delete"
+      ],
+      "source": "app/src/local/tvgpt/assistant/KnowledgeTools.java",
+      "detail": ""
+    },
+    {
+      "section": "Напоминания",
+      "action": "Прочитать напоминания и таймеры",
+      "state": "direct",
+      "tools": [
+        "reminder_list"
+      ],
+      "source": "app/src/local/tvgpt/assistant/ReminderTools.java",
+      "detail": ""
+    },
+    {
+      "section": "Напоминания",
+      "action": "Создать напоминание, повтор, дни недели и разрешённое действие",
+      "state": "direct",
+      "tools": [
+        "reminder_create"
+      ],
+      "source": "app/src/local/tvgpt/assistant/ReminderTools.java",
+      "detail": ""
+    },
+    {
+      "section": "Напоминания",
+      "action": "Создать таймер",
+      "state": "direct",
+      "tools": [
+        "timer_create"
+      ],
+      "source": "app/src/local/tvgpt/assistant/ReminderTools.java",
+      "detail": ""
+    },
+    {
+      "section": "Напоминания",
+      "action": "Отменить напоминание или таймер",
+      "state": "direct",
+      "tools": [
+        "reminder_cancel"
+      ],
+      "source": "app/src/local/tvgpt/assistant/ReminderTools.java",
+      "detail": ""
+    },
+    {
+      "section": "Напоминания",
+      "action": "Изменить текст, дату, время или повтор существующей записи",
+      "state": "direct",
+      "tools": [
+        "reminder_update"
+      ],
+      "source": "app/src/local/tvgpt/assistant/ReminderTools.java",
+      "detail": "Обновление по id/revision; ACTION сохраняется; TIMER изменяется отдельным timer_update."
+    },
+    {
+      "section": "Напоминания",
+      "action": "Удалить запись из списка",
+      "state": "direct",
+      "tools": [
+        "reminder_delete"
+      ],
+      "source": "app/src/local/tvgpt/assistant/ReminderTools.java",
+      "detail": "Атомарное удаление по id/revision, запрет delivering, подтверждение отсутствия строки."
+    },
+    {
+      "section": "Дайджесты",
+      "action": "Список и чтение подборок и статей",
+      "state": "direct",
+      "tools": [
+        "digest_list",
+        "digest_read"
+      ],
+      "source": "app/src/local/tvgpt/assistant/digests/DigestToolContract.java",
+      "detail": "Наличие маршрута не доказывает успешную сеть, генерацию или воспроизведение на устройстве."
+    },
+    {
+      "section": "Дайджесты",
+      "action": "Создать, изменить, удалить и включить подборку; темы и режим источников",
+      "state": "direct",
+      "tools": [
+        "digest_mutate"
+      ],
+      "source": "app/src/local/tvgpt/assistant/digests/DigestToolContract.java",
+      "detail": "Наличие маршрута не доказывает успешную сеть, генерацию или воспроизведение на устройстве."
+    },
+    {
+      "section": "Дайджесты",
+      "action": "Включить показ подборки в заставке",
+      "state": "direct",
+      "tools": [
+        "digest_mutate"
+      ],
+      "source": "app/src/local/tvgpt/assistant/digests/DigestToolContract.java",
+      "detail": "Наличие маршрута не доказывает успешную сеть, генерацию или воспроизведение на устройстве."
+    },
+    {
+      "section": "Дайджесты",
+      "action": "Список и интернет-поиск источников",
+      "state": "direct",
+      "tools": [
+        "digest_source_list",
+        "digest_source_search"
+      ],
+      "source": "app/src/local/tvgpt/assistant/digests/DigestToolContract.java",
+      "detail": "Наличие маршрута не доказывает успешную сеть, генерацию или воспроизведение на устройстве."
+    },
+    {
+      "section": "Дайджесты",
+      "action": "Добавить, изменить, удалить и включить источник",
+      "state": "direct",
+      "tools": [
+        "digest_source_mutate"
+      ],
+      "source": "app/src/local/tvgpt/assistant/digests/DigestToolContract.java",
+      "detail": "Наличие маршрута не доказывает успешную сеть, генерацию или воспроизведение на устройстве."
+    },
+    {
+      "section": "Дайджесты",
+      "action": "Список и создание, изменение, удаление, включение расписания",
+      "state": "direct",
+      "tools": [
+        "digest_schedule_list",
+        "digest_schedule_mutate"
+      ],
+      "source": "app/src/local/tvgpt/assistant/digests/DigestToolContract.java",
+      "detail": "Наличие маршрута не доказывает успешную сеть, генерацию или воспроизведение на устройстве."
+    },
+    {
+      "section": "Дайджесты",
+      "action": "Обновить новости и проверить фоновое задание",
+      "state": "direct",
+      "tools": [
+        "digest_refresh",
+        "digest_job_read"
+      ],
+      "source": "app/src/local/tvgpt/assistant/digests/DigestToolContract.java",
+      "detail": "Наличие маршрута не доказывает успешную сеть, генерацию или воспроизведение на устройстве."
+    },
+    {
+      "section": "Дайджесты",
+      "action": "Создать новую обложку новости",
+      "state": "direct",
+      "tools": [
+        "digest_cover_generate",
+        "digest_job_read"
+      ],
+      "source": "app/src/local/tvgpt/assistant/digests/DigestToolContract.java",
+      "detail": "Наличие маршрута не доказывает успешную сеть, генерацию или воспроизведение на устройстве."
+    },
+    {
+      "section": "Дайджесты",
+      "action": "Открыть подборку и полноэкранный просмотр",
+      "state": "direct",
+      "tools": [
+        "digest_open"
+      ],
+      "source": "app/src/local/tvgpt/assistant/digests/DigestToolContract.java",
+      "detail": "Наличие маршрута не доказывает успешную сеть, генерацию или воспроизведение на устройстве."
+    },
+    {
+      "section": "Дайджесты",
+      "action": "Выбрать TV GPT системной заставкой",
+      "state": "system_ui",
+      "tools": [],
+      "source": "app/src/local/tvgpt/assistant/ui/DigestsScreen.java",
+      "detail": "Открывается системный ACTION_DREAM_SETTINGS; digest_mutate.screensaver управляет участием подборки, а не выбором системной заставки."
+    },
+    {
+      "section": "Дайджесты",
+      "action": "Открыть публикацию в браузере по источнику",
+      "state": "ui_only",
+      "tools": [],
+      "source": "app/src/local/tvgpt/assistant/ui/DigestsScreen.java",
+      "detail": "Кнопка запускает ACTION_VIEW; отдельного open_url нет. Веб-поиск не равен открытию браузера."
+    },
+    {
+      "section": "Настройки ассистента",
+      "action": "Цвет кружка",
+      "state": "ui_only",
+      "tools": [],
+      "source": "app/src/local/tvgpt/assistant/ui/AppearanceScreen.java",
+      "detail": "Прямого инструмента чтения/изменения настроек нет. Общая навигация по экрану возможна, но это другой путь."
+    },
+    {
+      "section": "Настройки ассистента",
+      "action": "Смена голоса с проверкой образца",
+      "state": "ui_only",
+      "tools": [],
+      "source": "app/src/local/tvgpt/assistant/ui/AppearanceScreen.java",
+      "detail": "Прямого инструмента чтения/изменения настроек нет. Общая навигация по экрану возможна, но это другой путь."
+    },
+    {
+      "section": "Настройки ассистента",
+      "action": "Прослушать образец голоса",
+      "state": "ui_only",
+      "tools": [],
+      "source": "app/src/local/tvgpt/assistant/ui/AppearanceScreen.java",
+      "detail": "Прямого инструмента чтения/изменения настроек нет. Общая навигация по экрану возможна, но это другой путь."
+    },
+    {
+      "section": "Настройки ассистента",
+      "action": "Манера речи",
+      "state": "ui_only",
+      "tools": [],
+      "source": "app/src/local/tvgpt/assistant/ui/AppearanceScreen.java",
+      "detail": "Прямого инструмента чтения/изменения настроек нет. Общая навигация по экрану возможна, но это другой путь."
+    },
+    {
+      "section": "Настройки ассистента",
+      "action": "Модель обсуждения",
+      "state": "ui_only",
+      "tools": [],
+      "source": "app/src/local/tvgpt/assistant/ui/AppearanceScreen.java",
+      "detail": "Прямого инструмента чтения/изменения настроек нет. Общая навигация по экрану возможна, но это другой путь."
+    },
+    {
+      "section": "Настройки ассистента",
+      "action": "Модель описаний разговоров",
+      "state": "ui_only",
+      "tools": [],
+      "source": "app/src/local/tvgpt/assistant/ui/AppearanceScreen.java",
+      "detail": "Прямого инструмента чтения/изменения настроек нет. Общая навигация по экрану возможна, но это другой путь."
+    },
+    {
+      "section": "Настройки ассистента",
+      "action": "Модель Live",
+      "state": "ui_only",
+      "tools": [],
+      "source": "app/src/local/tvgpt/assistant/ui/AppearanceScreen.java",
+      "detail": "Прямого инструмента чтения/изменения настроек нет. Общая навигация по экрану возможна, но это другой путь."
+    },
+    {
+      "section": "Настройки ассистента",
+      "action": "Модель дайджестов",
+      "state": "ui_only",
+      "tools": [],
+      "source": "app/src/local/tvgpt/assistant/ui/AppearanceScreen.java",
+      "detail": "Прямого инструмента чтения/изменения настроек нет. Общая навигация по экрану возможна, но это другой путь."
+    },
+    {
+      "section": "Настройки ассистента",
+      "action": "Уровень рассуждения обсуждения",
+      "state": "ui_only",
+      "tools": [],
+      "source": "app/src/local/tvgpt/assistant/ui/AppearanceScreen.java",
+      "detail": "Прямого инструмента чтения/изменения настроек нет. Общая навигация по экрану возможна, но это другой путь."
+    },
+    {
+      "section": "Настройки ассистента",
+      "action": "Fast / обычная обработка",
+      "state": "ui_only",
+      "tools": [],
+      "source": "app/src/local/tvgpt/assistant/ui/AppearanceScreen.java",
+      "detail": "Прямого инструмента чтения/изменения настроек нет. Общая навигация по экрану возможна, но это другой путь."
+    },
+    {
+      "section": "Настройки",
+      "action": "Общий часовой пояс",
+      "state": "ui_only",
+      "tools": [],
+      "source": "app/src/local/tvgpt/assistant/TechnicalSettingsView.java",
+      "detail": "Прямого инструмента нет. mute управляет общим звуком ТВ, а не настройкой приглушения."
+    },
+    {
+      "section": "Настройки",
+      "action": "Приглушение других приложений во время разговора",
+      "state": "ui_only",
+      "tools": [],
+      "source": "app/src/local/tvgpt/assistant/TechnicalSettingsView.java",
+      "detail": "Прямого инструмента нет. mute управляет общим звуком ТВ, а не настройкой приглушения."
+    },
+    {
+      "section": "Настройки",
+      "action": "Фоновый голосовой вызов",
+      "state": "ui_only",
+      "tools": [],
+      "source": "app/src/local/tvgpt/assistant/TechnicalSettingsView.java",
+      "detail": "Прямого инструмента нет. mute управляет общим звуком ТВ, а не настройкой приглушения."
+    },
+    {
+      "section": "Настройка и доступы",
+      "action": "Вход по коду устройства",
+      "state": "setup_ui",
+      "tools": [],
+      "source": "app/src/local/tvgpt/assistant/TechnicalSettingsView.java",
+      "detail": "Отдельного инструмента нет; операции выполняются из интерфейса. Системный запрос разрешения не равен подтверждённому доступу."
+    },
+    {
+      "section": "Настройка и доступы",
+      "action": "Выход из аккаунта",
+      "state": "setup_ui",
+      "tools": [],
+      "source": "app/src/local/tvgpt/assistant/TechnicalSettingsView.java",
+      "detail": "Отдельного инструмента нет; операции выполняются из интерфейса. Системный запрос разрешения не равен подтверждённому доступу."
+    },
+    {
+      "section": "Настройка и доступы",
+      "action": "Замена Google системным ассистентом",
+      "state": "setup_ui",
+      "tools": [],
+      "source": "app/src/local/tvgpt/assistant/TechnicalSettingsView.java",
+      "detail": "Отдельного инструмента нет; операции выполняются из интерфейса. Системный запрос разрешения не равен подтверждённому доступу."
+    },
+    {
+      "section": "Настройка и доступы",
+      "action": "Проверка помощника с диагностическим ответом",
+      "state": "setup_ui",
+      "tools": [],
+      "source": "app/src/local/tvgpt/assistant/TechnicalSettingsView.java",
+      "detail": "Отдельного инструмента нет; операции выполняются из интерфейса. Системный запрос разрешения не равен подтверждённому доступу."
+    },
+    {
+      "section": "Настройка и доступы",
+      "action": "Подключение локального пульта",
+      "state": "setup_ui",
+      "tools": [],
+      "source": "app/src/local/tvgpt/assistant/TechnicalSettingsView.java",
+      "detail": "Отдельного инструмента нет; операции выполняются из интерфейса. Системный запрос разрешения не равен подтверждённому доступу."
+    },
+    {
+      "section": "Настройка и доступы",
+      "action": "Экран специальных возможностей",
+      "state": "setup_ui",
+      "tools": [],
+      "source": "app/src/local/tvgpt/assistant/TechnicalSettingsView.java",
+      "detail": "Отдельного инструмента нет; операции выполняются из интерфейса. Системный запрос разрешения не равен подтверждённому доступу."
+    },
+    {
+      "section": "Настройка и доступы",
+      "action": "Разрешение точных напоминаний",
+      "state": "setup_ui",
+      "tools": [],
+      "source": "app/src/local/tvgpt/assistant/TechnicalSettingsView.java",
+      "detail": "Отдельного инструмента нет; операции выполняются из интерфейса. Системный запрос разрешения не равен подтверждённому доступу."
+    },
+    {
+      "section": "Навигация",
+      "action": "Открыть определённый раздел TV GPT",
+      "state": "missing",
+      "tools": [],
+      "source": "app/src/local/tvgpt/assistant/MainActivity.java",
+      "detail": "MainActivity уже понимает section для шести разделов; модель имеет только open_app, кроме специализированного digest_open."
+    },
+    {
+      "section": "Голосовой разговор",
+      "action": "Завершить текущий разговор",
+      "state": "direct",
+      "tools": [
+        "end_conversation"
+      ],
+      "source": "app/src/local/tvgpt/assistant/Agent.java",
+      "detail": "Маршрут существует; семантическое делегирование Live не считается проверенным одним наличием инструмента."
+    },
+    {
+      "section": "Напоминания",
+      "action": "Изменить длительность или текст таймера",
+      "state": "direct",
+      "tools": [
+        "timer_update"
+      ],
+      "source": "app/src/local/tvgpt/assistant/ReminderTools.java",
+      "detail": "seconds=0 сохраняет срок; seconds>0 сбрасывает отсчёт в той же TIMER-записи."
+    }
+  ],
+  "findings": [
+    {
+      "id": "reminder-dispatch-fallthrough",
+      "kind": "dispatch-risk",
+      "source": "app/src/local/tvgpt/assistant/ReminderTools.java",
+      "detail": "Неизвестное имя после reminder_list/reminder_cancel попадает в ветку создания. Внешний каталог таких имён не объявляет, но обработчик должен явно отклонять неподдерживаемые команды. Фактический ошибочный вызов здесь не доказан.",
+      "state": "fixed",
+      "resolution": "Явный список поддерживаемых имён отклоняет неизвестную команду до доступа к базе; проверено тестом настоящего ReminderTools."
+    },
+    {
+      "id": "data-screen-refresh",
+      "kind": "observable-gap",
+      "source": "app/src/local/tvgpt/assistant/ui/",
+      "detail": "KnowledgeScreen и RemindersScreen не подписаны на изменения данных. DigestsScreen слушает DIGEST_CHANGED, отправляемый DigestAssembler после сборки; изменение конфигурации через DigestCommands само его не отправляет. Поэтому успешное голосовое изменение может не сразу отобразиться в уже открытом экране.",
+      "state": "implemented",
+      "resolution": "AppDataEvents после успешных голосовых изменений; AsyncScreen подписывает знания, напоминания и дайджесты. События объединяются, фокус сохраняется по ключу карточки. Android-проверка ниже фиксируется отдельно."
+    },
+    {
+      "id": "settings-orb-contract",
+      "kind": "ui-contract-drift",
+      "source": "app/src/local/tvgpt/assistant/ui/AppearanceScreen.java",
+      "detail": "Конструктор всё ещё добавляет VoiceOrb в основной экран, хотя утверждённый контракт требует только настройки. Изменения карточек не меняли этот конструктор."
+    },
+    {
+      "id": "bulk-archive-round-limit",
+      "kind": "runtime-bound",
+      "source": "app/src/local/tvgpt/assistant/Agent.java",
+      "detail": "Один этап ограничен 40 раундами инструментов. Большая очистка архива может завершиться частично; нельзя обещать удаление всего архива без результата всех удалений."
+    }
+  ],
+  "priority": [
+    "Общий безопасный app_open_section и описание реальных возможностей помощнику",
+    "settings_read и типизированные изменения настроек с каталогами и проверкой голоса; без произвольных prefs/Intent/shell",
+    "Повтор описания разговора и обновление уже открытых списков после голосовых изменений"
+  ],
+  "reconciled_after_commit": "7fe6799",
+  "reconciliation": "Добавлены reminder_update, timer_update, reminder_delete и обновление списков; остальные пункты аудита сохраняют прежний статус."
+}

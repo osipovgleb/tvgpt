@@ -227,3 +227,7 @@ final class DigestTools {
     return "{}";
   }
 }
+
+final class ArchiveEvents {
+  static void changed(android.content.Context context) {}
+}

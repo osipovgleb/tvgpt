@@ -7,7 +7,7 @@ import java.util.*;
 import org.json.*;
 
 public final class SQLiteDatabase implements AutoCloseable {
-  public static final int CONFLICT_REPLACE = 5;
+  public static final int CONFLICT_REPLACE = 5, CONFLICT_IGNORE = 4;
   private final Process process;
   private final BufferedReader input;
   private final BufferedWriter output;
@@ -68,10 +68,19 @@ public final class SQLiteDatabase implements AutoCloseable {
       keys.add(key);
       slots.add("?");
     }
-    return execute(
-            "INSERT OR REPLACE INTO " + table + " (" + keys + ") VALUES (" + slots + ")",
-            values.values().toArray())
-        .optLong("id");
+    JSONObject result =
+        execute(
+            "INSERT OR "
+                + (mode == CONFLICT_IGNORE ? "IGNORE" : "REPLACE")
+                + " INTO "
+                + table
+                + " ("
+                + keys
+                + ") VALUES ("
+                + slots
+                + ")",
+            values.values().toArray());
+    return result.optInt("changes") == 0 ? -1 : result.optLong("id");
   }
 
   public long insertOrThrow(String table, String unused, ContentValues values) {

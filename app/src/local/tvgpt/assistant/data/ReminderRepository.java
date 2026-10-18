@@ -80,6 +80,26 @@ public final class ReminderRepository {
     return query("SELECT * FROM reminders ORDER BY enabled DESC,due LIMIT 200", null);
   }
 
+  public JSONObject get(long id) {
+    return query("SELECT * FROM reminders WHERE id=?", new String[] {"" + id}).optJSONObject(0);
+  }
+
+  public boolean deleteIfCurrent(long id, long revision, CancellationToken token) {
+    return ReminderChanges.delete(db, id, revision, token);
+  }
+
+  public void editTimer(
+      long id,
+      long revision,
+      String body,
+      long seconds,
+      long wallNow,
+      long elapsedNow,
+      String boot,
+      CancellationToken token) {
+    ReminderChanges.timer(db, id, revision, body, seconds, wallNow, elapsedNow, boot, token);
+  }
+
   public JSONArray pending(long now) {
     return query(
         "SELECT * FROM reminders WHERE enabled=1 AND status IN ('scheduled','pending') AND due<=?"

@@ -68,6 +68,16 @@ final class TvTools {
             .toString();
       }
     }
+    if (name.equals("volume") && !args.has("muted") && !args.has("percent")) {
+      if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper())
+        throw new IllegalStateException("Remote volume requires a worker thread");
+      String external =
+          VolumeRemote.execute(
+              context.getApplicationInfo().sourceDir,
+              args.optString("direction", "up"),
+              command -> AdbRemote.shell(context, command, 8000, token));
+      if (external != null) return external;
+    }
     final JSONObject pinnedArgs = args;
     return new TvActionObserver(context, token)
         .execute(name, pinnedArgs, () -> executeRaw(name, pinnedArgs));

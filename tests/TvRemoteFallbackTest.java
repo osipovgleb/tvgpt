@@ -24,7 +24,8 @@ public final class TvRemoteFallbackTest {
   public static void main(String[] args) throws Exception {
     Screen screen = new Screen();
     TvAccessibility.current = screen;
-    TvTools tools = new TvTools(new Context());
+    Context context = new Context();
+    TvTools tools = new TvTools(context);
     Method raw = TvTools.class.getDeclaredMethod("executeRaw", String.class, JSONObject.class);
     raw.setAccessible(true);
     JSONObject key = new JSONObject().put("direction", "back");
@@ -48,6 +49,16 @@ public final class TvRemoteFallbackTest {
     if (!media.optString("status").equals("unconfirmed")
         || !media.optString("dispatch_status").equals("uncertain"))
       throw new AssertionError("post-dispatch media error lost uncertainty: " + media);
+    for (int phase : new int[] {4, 5}) {
+      AdbRemote.phase = phase;
+      int calls = AdbRemote.volumeCalls;
+      JSONObject volume =
+          new JSONObject(tools.execute("volume", new JSONObject().put("direction", "up")));
+      if (context.audio.mutations != 0 || AdbRemote.volumeCalls != calls + 1)
+        throw new AssertionError("External volume also changed Android stream or retried");
+      if (!volume.optString("status").equals(phase == 4 ? "observed" : "unconfirmed"))
+        throw new AssertionError("External result evidence lost");
+    }
     System.out.println("TvRemoteFallbackTest passed");
   }
 }

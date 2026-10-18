@@ -18,7 +18,17 @@ public final class SettingsGlyph extends View {
       BOOK = 9,
       CLOCK = 10,
       SETTINGS = 11,
-      PALETTE = 12;
+      PALETTE = 12,
+      PLUS = 13,
+      TIMER = 14,
+      NEWS = 15,
+      REFRESH = 16,
+      PLAY = 17,
+      DELETE = 18,
+      EDIT = 19,
+      LINK = 20,
+      BELL = 21,
+      STOP = 22;
   private final int kind;
   private final Paint p = new Paint(3);
 
@@ -45,6 +55,10 @@ public final class SettingsGlyph extends View {
   }
 
   private void drawIcon(Canvas c) {
+    if (kind >= PLUS) {
+      drawActionIcon(c);
+      return;
+    }
     if (kind >= CHAT) {
       drawMenuIcon(c);
       return;
@@ -149,6 +163,93 @@ public final class SettingsGlyph extends View {
         c.drawCircle(13, 7, 1, p);
         c.drawCircle(17, 11, 1, p);
         c.drawCircle(8, 15, 1, p);
+        break;
+    }
+  }
+
+  private void drawActionIcon(Canvas c) {
+    Path path = new Path();
+    switch (kind) {
+      case PLUS:
+        c.drawLine(12, 5, 12, 19, p);
+        c.drawLine(5, 12, 19, 12, p);
+        break;
+      case TIMER:
+        c.drawCircle(12, 14, 7, p);
+        c.drawLine(9, 2, 15, 2, p);
+        c.drawLine(12, 2, 12, 5, p);
+        c.drawLine(17, 7, 19, 5, p);
+        c.drawLine(12, 10, 12, 14, p);
+        break;
+      case NEWS:
+        c.drawRoundRect(3, 4, 21, 20, 2, 2, p);
+        c.drawRect(6, 8, 11, 13, p);
+        c.drawLine(14, 8, 18, 8, p);
+        c.drawLine(14, 12, 18, 12, p);
+        c.drawLine(6, 16, 18, 16, p);
+        break;
+      case REFRESH:
+        c.drawArc(4, 4, 20, 20, 35, 290, false, p);
+        c.drawLine(19, 3, 19, 8, p);
+        c.drawLine(14, 8, 19, 8, p);
+        break;
+      case PLAY:
+        path.moveTo(8, 4);
+        path.lineTo(20, 12);
+        path.lineTo(8, 20);
+        path.close();
+        c.drawPath(path, p);
+        break;
+      default:
+        drawManagementIcon(c);
+        break;
+    }
+  }
+
+  private void drawManagementIcon(Canvas c) {
+    Path path = new Path();
+    switch (kind) {
+      case DELETE:
+        c.drawLine(4, 6, 20, 6, p);
+        c.drawLine(9, 3, 15, 3, p);
+        path.moveTo(6, 6);
+        path.lineTo(7, 21);
+        path.lineTo(17, 21);
+        path.lineTo(18, 6);
+        c.drawPath(path, p);
+        c.drawLine(10, 10, 10, 17, p);
+        c.drawLine(14, 10, 14, 17, p);
+        break;
+      case EDIT:
+        path.moveTo(4, 15);
+        path.lineTo(15, 4);
+        path.lineTo(20, 9);
+        path.lineTo(9, 20);
+        path.lineTo(4, 21);
+        path.close();
+        c.drawPath(path, p);
+        c.drawLine(13, 6, 18, 11, p);
+        break;
+      case LINK:
+        c.save();
+        c.rotate(-40, 12, 12);
+        c.drawRoundRect(2, 8, 13, 16, 4, 4, p);
+        c.drawRoundRect(11, 8, 22, 16, 4, 4, p);
+        c.restore();
+        break;
+      case BELL:
+        path.moveTo(4, 17);
+        path.lineTo(6, 14);
+        path.lineTo(6, 9);
+        path.cubicTo(6, 1, 18, 1, 18, 9);
+        path.lineTo(18, 14);
+        path.lineTo(20, 17);
+        path.close();
+        c.drawPath(path, p);
+        c.drawArc(9, 17, 15, 22, 0, 180, false, p);
+        break;
+      case STOP:
+        c.drawRoundRect(5, 5, 19, 19, 3, 3, p);
         break;
     }
   }

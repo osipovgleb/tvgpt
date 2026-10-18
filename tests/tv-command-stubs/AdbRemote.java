@@ -5,6 +5,7 @@ import java.io.IOException;
 
 final class AdbRemote {
   static int phase;
+  static int volumeCalls;
 
   static final class DispatchException extends IOException {}
 
@@ -24,6 +25,12 @@ final class AdbRemote {
 
   static String shell(Context context, String command, int timeout, CancellationToken token)
       throws Exception {
+    if (phase == 4 || phase == 5) {
+      volumeCalls++;
+      if (phase == 5) throw new DispatchException();
+      return "{\"route\":\"hdmi_system_audio\",\"status\":\"observed\","
+          + "\"confirmed_scope\":\"cec_audio_volume_readback\"}";
+    }
     if (phase == 3) {
       if (command.equals("dumpsys media_session"))
         return "    music com.music/music (userId=0)\n"

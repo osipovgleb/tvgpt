@@ -3,12 +3,14 @@ package local.tvgpt.assistant.ui;
 import android.app.*;
 import android.content.*;
 import android.widget.*;
+import local.tvgpt.assistant.SettingsGlyph;
 import local.tvgpt.assistant.data.*;
 import org.json.*;
 
 public final class KnowledgeScreen extends AsyncScreen {
   public KnowledgeScreen(Context c) {
     super(c, "Общие знания");
+    observeData(local.tvgpt.assistant.AppDataEvents.KNOWLEDGE, this::refresh);
     refresh();
   }
 
@@ -17,7 +19,9 @@ public final class KnowledgeScreen extends AsyncScreen {
         () -> new KnowledgeRepository(getContext()).list(),
         notes -> {
           body.removeAllViews();
-          body.addView(Screens.button(getContext(), "Добавить знание", () -> edit(null)));
+          body.addView(
+              Screens.action(
+                  getContext(), SettingsGlyph.PLUS, "Добавить знание", () -> edit(null)));
           if (notes.length() == 0)
             body.addView(
                 Screens.text(
@@ -26,7 +30,15 @@ public final class KnowledgeScreen extends AsyncScreen {
                     16));
           for (int i = 0; i < notes.length(); i++) {
             JSONObject n = notes.optJSONObject(i);
-            body.addView(Screens.button(getContext(), n.optString("title"), () -> edit(n)));
+            body.addView(
+                new LibraryCard(
+                        getContext(),
+                        SettingsGlyph.BOOK,
+                        n.optString("title"),
+                        n.optString("text"),
+                        "",
+                        () -> edit(n))
+                    .withKey("knowledge:" + n.optLong("id")));
           }
         });
   }
