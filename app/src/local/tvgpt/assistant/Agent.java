@@ -419,7 +419,11 @@ final class Agent {
             context, name, new JSONObject(item.optString("arguments", "{}")), cancellation);
       if (name.startsWith("conversation_"))
         return ConversationTools.execute(
-            context, name, new JSONObject(item.optString("arguments", "{}")), session.id);
+            context,
+            name,
+            new JSONObject(item.optString("arguments", "{}")),
+            session.id,
+            cancellation);
       if (name.equals("load_app_skill"))
         return AssistantSkills.app(
             context, new JSONObject(item.optString("arguments", "{}")).optString("name"));

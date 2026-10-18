@@ -5,6 +5,12 @@ import org.json.*;
 
 public final class ConversationToolsTest {
   public static void main(String[] args) throws Exception {
+    JSONArray schemas = new JSONArray();
+    ConversationTools.schemas(schemas);
+    boolean exposed = false;
+    for (int i = 0; i < schemas.length(); i++)
+      if (schemas.getJSONObject(i).optString("name").equals("conversation_delete")) exposed = true;
+    if (!exposed) throw new AssertionError("Deletion implementation was not exposed to the model");
     for (int i = 0; i < 30; i++)
       ConversationRepository.records.put(
           new JSONObject()
@@ -43,8 +49,41 @@ public final class ConversationToolsTest {
       rejected = true;
     }
     if (!rejected) throw new AssertionError("Deleted archive was read");
+    deletionChecks();
     System.out.println(
         "ConversationToolsTest: bounded recall, Unicode, pagination and deleted/current exclusion"
             + " passed");
+  }
+
+  private static void deletionChecks() throws Exception {
+    ConversationRepository.deleted = false;
+    JSONObject deletion = new JSONObject().put("id", "past").put("revision", 2);
+    JSONObject conflict =
+        (JSONObject) ConversationTools.execute(null, "conversation_delete", deletion, "current");
+    if (conflict.getBoolean("deleted") || ConversationRepository.deleted)
+      throw new AssertionError("Unseen revision was deleted");
+    try {
+      ConversationTools.execute(
+          null, "conversation_delete", deletion.put("id", "current").put("revision", 1), "current");
+      throw new AssertionError("Active call was deleted");
+    } catch (IllegalArgumentException expected) {
+    }
+    CancellationToken token = new CancellationToken();
+    token.cancel();
+    try {
+      ConversationTools.execute(
+          null, "conversation_delete", deletion.put("id", "past"), "current", token);
+      throw new AssertionError("Cancelled deletion executed");
+    } catch (java.util.concurrent.CancellationException expected) {
+    }
+    JSONObject deleted =
+        (JSONObject) ConversationTools.execute(null, "conversation_delete", deletion, "current");
+    if (!deleted.getBoolean("deleted")
+        || !deleted.getString("confirmed_scope").equals("local_archive_deletion"))
+      throw new AssertionError("Actual deletion not confirmed");
+    JSONObject duplicate =
+        (JSONObject) ConversationTools.execute(null, "conversation_delete", deletion, "current");
+    if (duplicate.getBoolean("deleted"))
+      throw new AssertionError("Duplicate deletion reported a new success");
   }
 }

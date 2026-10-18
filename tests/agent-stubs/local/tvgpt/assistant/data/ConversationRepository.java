@@ -17,8 +17,20 @@ public final class ConversationRepository {
     return new JSONArray();
   }
 
+  public JSONArray search(String q, long since, long until, String current, int limit, int offset) {
+    return new JSONArray();
+  }
+
+  public boolean deleteIfCurrent(
+      String id, long revision, local.tvgpt.assistant.CancellationToken token) {
+    token.check();
+    if (deleted || revision != 1) return false;
+    deleted = true;
+    return true;
+  }
+
   public JSONObject get(String id) throws Exception {
-    return deleted ? null : new JSONObject().put("id", id);
+    return deleted ? null : new JSONObject().put("id", id).put("revision", 1);
   }
 
   public JSONArray turns(String id, int limit, int offset) {

@@ -3,6 +3,7 @@ package local.tvgpt.assistant.data;
 import android.content.*;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import local.tvgpt.assistant.CancellationToken;
 import org.json.*;
 
 public final class ConversationRepository {
@@ -92,11 +93,16 @@ public final class ConversationRepository {
   }
 
   public JSONArray search(String text, long since, long until, String current, int limit) {
+    return search(text, since, until, current, Math.max(1, Math.min(10, limit)), 0);
+  }
+
+  public JSONArray search(
+      String text, long since, long until, String current, int limit, int offset) {
     String bounded = text == null ? "" : text.substring(0, Math.min(200, text.length()));
     String pattern =
         "%" + bounded.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
     return query(
-        "SELECT c.id,c.started,c.ended,substr(c.title,1,160) AS title,"
+        "SELECT c.id,c.revision,c.started,c.ended,substr(c.title,1,160) AS title,"
             + "substr(c.summary,1,1000) AS summary,"
             + excerpt()
             + " AS excerpt"
@@ -104,7 +110,7 @@ public final class ConversationRepository {
             + " AND (CAST(? AS INTEGER)=0 OR c.ended>=?) AND (CAST(? AS INTEGER)=0 OR c.started<=?)"
             + " AND (c.title LIKE ? ESCAPE '\\' OR c.summary LIKE ? ESCAPE '\\'"
             + " OR EXISTS(SELECT 1 FROM turns t WHERE t.conversation=c.id"
-            + " AND t.text LIKE ? ESCAPE '\\')) ORDER BY c.ended DESC LIMIT ?",
+            + " AND t.text LIKE ? ESCAPE '\\')) ORDER BY c.ended DESC,c.id DESC LIMIT ? OFFSET ?",
         new String[] {
           current,
           "" + Math.max(0, since),
@@ -114,7 +120,8 @@ public final class ConversationRepository {
           pattern,
           pattern,
           pattern,
-          "" + Math.max(1, Math.min(10, limit))
+          "" + Math.max(1, Math.min(11, limit)),
+          "" + Math.max(0, Math.min(100000, offset))
         });
   }
 
@@ -144,6 +151,33 @@ public final class ConversationRepository {
           "UPDATE conversations SET deleted=1,revision=revision+1,title='',summary='' WHERE id=?",
           new Object[] {id});
       db.setTransactionSuccessful();
+    } finally {
+      db.endTransaction();
+    }
+  }
+
+  /** Atomic revision check and tombstone prevent deleting unseen new turns or late resurrection. */
+  public boolean deleteIfCurrent(String id, long expected, CancellationToken token) {
+    token.check();
+    db.beginTransaction();
+    try {
+      token.check();
+      ContentValues values = new ContentValues();
+      values.put("deleted", 1);
+      values.put("revision", expected + 1);
+      values.put("title", "");
+      values.put("summary", "");
+      if (db.update(
+              "conversations",
+              values,
+              "id=? AND revision=? AND deleted=0",
+              new String[] {id, "" + expected})
+          != 1) return false;
+      token.check();
+      db.delete("turns", "conversation=?", new String[] {id});
+      token.check();
+      db.setTransactionSuccessful();
+      return true;
     } finally {
       db.endTransaction();
     }
