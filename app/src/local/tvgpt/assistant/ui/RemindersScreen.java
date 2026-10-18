@@ -4,6 +4,7 @@ import android.app.*;
 import android.content.Context;
 import android.widget.*;
 import java.time.*;
+import local.tvgpt.assistant.SettingsGlyph;
 import local.tvgpt.assistant.data.ReminderRepository;
 import local.tvgpt.assistant.reminders.*;
 import org.json.*;
@@ -19,8 +20,12 @@ public final class RemindersScreen extends AsyncScreen {
         () -> new ReminderRepository(getContext()).list(),
         items -> {
           body.removeAllViews();
-          body.addView(Screens.button(getContext(), "Добавить напоминание", () -> create(false)));
-          body.addView(Screens.button(getContext(), "Поставить таймер", () -> create(true)));
+          body.addView(
+              Screens.action(
+                  getContext(), SettingsGlyph.PLUS, "Добавить напоминание", () -> create(false)));
+          body.addView(
+              Screens.action(
+                  getContext(), SettingsGlyph.TIMER, "Поставить таймер", () -> create(true)));
           for (int i = 0; i < items.length(); i++) {
             JSONObject n = items.optJSONObject(i);
             String date =
@@ -30,14 +35,20 @@ public final class RemindersScreen extends AsyncScreen {
                         java.time.format.DateTimeFormatter.ofLocalizedDateTime(
                             java.time.format.FormatStyle.SHORT));
             body.addView(
-                Screens.button(
+                new LibraryCard(
                     getContext(),
-                    n.optString("body") + " · " + date + " · " + statusLabel(n.optString("status")),
+                    SettingsGlyph.BELL,
+                    n.optString("body"),
+                    date,
+                    statusLabel(n.optString("status")),
                     () ->
                         new RightSheet.Builder(getContext())
                             .setTitle(n.optString("body"))
-                            .setItems(
+                            .setIconItems(
                                 new String[] {"Изменить", "Отменить", "Удалить"},
+                                new int[] {
+                                  SettingsGlyph.EDIT, SettingsGlyph.STOP, SettingsGlyph.DELETE
+                                },
                                 (d, which) -> {
                                   if (which == 0) {
                                     new ReminderEditor(getContext(), false, n, this::refresh)

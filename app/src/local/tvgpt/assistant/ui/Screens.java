@@ -61,6 +61,35 @@ public final class Screens {
     return b;
   }
 
+  public static View action(Context c, int icon, String title, Runnable action) {
+    LinearLayout row =
+        new LinearLayout(c) {
+          @Override
+          public CharSequence getAccessibilityClassName() {
+            return Button.class.getName();
+          }
+        };
+    row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+    row.setPadding(dp(c, 16), dp(c, 12), dp(c, 16), dp(c, 12));
+    row.setMinimumHeight(dp(c, 54));
+    row.setFocusable(true);
+    row.setClickable(true);
+    row.setDescendantFocusability(android.view.ViewGroup.FOCUS_BLOCK_DESCENDANTS);
+    row.setContentDescription(title);
+    row.setBackground(LibraryCard.background(c));
+    row.addView(
+        new local.tvgpt.assistant.SettingsGlyph(c, icon),
+        new LinearLayout.LayoutParams(dp(c, 24), dp(c, 24)));
+    LinearLayout.LayoutParams label = new LinearLayout.LayoutParams(0, -2, 1);
+    label.leftMargin = dp(c, 12);
+    row.addView(LibraryCard.label(c, title, 15, 0xffeeeeee, 2), label);
+    LinearLayout.LayoutParams outer = new LinearLayout.LayoutParams(-1, -2);
+    outer.topMargin = dp(c, 8);
+    row.setLayoutParams(outer);
+    row.setOnClickListener(v -> action.run());
+    return row;
+  }
+
   public static android.graphics.drawable.GradientDrawable rounded(
       Context c, int colour, int radius) {
     android.graphics.drawable.GradientDrawable d = new android.graphics.drawable.GradientDrawable();

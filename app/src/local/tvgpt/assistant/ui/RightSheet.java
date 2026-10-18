@@ -39,6 +39,19 @@ public final class RightSheet {
     }
 
     @Override
+    public Builder setTitle(CharSequence title) {
+      super.setTitle(title);
+      return this;
+    }
+
+    public Builder setIconItems(
+        String[] labels, int[] icons, android.content.DialogInterface.OnClickListener listener) {
+      if (labels.length != icons.length) throw new IllegalArgumentException("Missing item icons");
+      super.setAdapter(new IconListAdapter(getContext(), labels, icons), listener);
+      return this;
+    }
+
+    @Override
     public AlertDialog show() {
       AlertDialog dialog = create();
       RightSheet.show(dialog);

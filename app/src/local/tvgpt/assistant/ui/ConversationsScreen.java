@@ -5,6 +5,7 @@ import android.content.Context;
 import android.widget.*;
 import java.text.DateFormat;
 import java.util.Date;
+import local.tvgpt.assistant.SettingsGlyph;
 import local.tvgpt.assistant.data.*;
 import org.json.*;
 
@@ -43,6 +44,7 @@ public final class ConversationsScreen extends AsyncScreen {
   private int offset;
   private int turnOffset;
   private String selected;
+  private boolean summaryFailed;
 
   public ConversationsScreen(Context c) {
     super(c, "Разговоры");
@@ -64,44 +66,44 @@ public final class ConversationsScreen extends AsyncScreen {
           body.removeAllViews();
           if (items.length() == 0)
             body.addView(Screens.text(getContext(), "Сохранённых разговоров пока нет.", 16));
+          GridLayout grid = new GridLayout(getContext());
+          grid.setColumnCount(2);
+          body.addView(grid, new LinearLayout.LayoutParams(-1, -2));
           for (int i = 0; i < items.length(); i++) {
             JSONObject item = items.optJSONObject(i);
             String label = item.optString("title");
             if (label.isEmpty()) label = "Разговор";
             final String id = item.optString("id");
-            body.addView(
-                Screens.button(
+            String preview = item.optString("summary");
+            if (preview.isEmpty()) preview = item.optString("excerpt", "");
+            LibraryCard card =
+                new LibraryCard(
                     getContext(),
-                    label
-                        + " · "
-                        + date(item.optLong("started"))
-                        + " — "
-                        + date(item.optLong("ended")),
+                    SettingsGlyph.CHAT,
+                    label,
+                    preview,
+                    date(item.optLong("started")),
                     () -> {
                       selected = id;
+                      summaryFailed = item.optString("summary_state").equals("failed");
                       showTurns(0);
-                    }));
-            body.addView(
-                Screens.text(
-                    getContext(),
-                    item.optString("summary").isEmpty()
-                        ? "Отрывок: " + item.optString("excerpt", "Описание ещё не подготовлено")
-                        : "Описание: " + item.optString("summary"),
-                    14));
-            if (item.optString("summary_state").equals("failed"))
-              body.addView(
-                  Screens.button(
-                      getContext(),
-                      "Повторить создание описания",
-                      () -> {
-                        local.tvgpt.assistant.ConversationSummarizer.request(getContext(), id);
-                        status.setText("Описание запрошено. Обновите список через минуту.");
-                      }));
+                    });
+            GridLayout.LayoutParams placement =
+                new GridLayout.LayoutParams(GridLayout.spec(i / 2), GridLayout.spec(i % 2, 1f));
+            placement.width = 0;
+            placement.height = Screens.dp(getContext(), 184);
+            placement.setMargins(
+                i % 2 == 0 ? 0 : Screens.dp(getContext(), 6),
+                Screens.dp(getContext(), 6),
+                i % 2 == 0 ? Screens.dp(getContext(), 6) : 0,
+                Screens.dp(getContext(), 6));
+            grid.addView(card, placement);
           }
           if (offset > 0)
             body.addView(
-                Screens.button(
+                Screens.action(
                     getContext(),
+                    SettingsGlyph.BACK,
                     "Предыдущие",
                     () -> {
                       offset = Math.max(0, offset - 20);
@@ -109,8 +111,9 @@ public final class ConversationsScreen extends AsyncScreen {
                     }));
           if (items.length() == 20)
             body.addView(
-                Screens.button(
+                Screens.action(
                     getContext(),
+                    SettingsGlyph.CHEVRON,
                     "Следующие",
                     () -> {
                       offset += 20;
@@ -126,10 +129,24 @@ public final class ConversationsScreen extends AsyncScreen {
         () -> new ConversationRepository(getContext()).turns(id, 30, page),
         items -> {
           body.removeAllViews();
-          body.addView(Screens.button(getContext(), "К списку разговоров", this::refresh));
           body.addView(
-              Screens.button(
+              Screens.action(
+                  getContext(), SettingsGlyph.BACK, "К списку разговоров", this::refresh));
+          if (summaryFailed)
+            body.addView(
+                Screens.action(
+                    getContext(),
+                    SettingsGlyph.REFRESH,
+                    "Повторить создание описания",
+                    () -> {
+                      local.tvgpt.assistant.ConversationSummarizer.request(getContext(), id);
+                      status.setVisibility(VISIBLE);
+                      status.setText("Описание запрошено");
+                    }));
+          body.addView(
+              Screens.action(
                   getContext(),
+                  SettingsGlyph.DELETE,
                   "Удалить разговор",
                   () ->
                       new RightSheet.Builder(getContext())
@@ -162,9 +179,15 @@ public final class ConversationsScreen extends AsyncScreen {
           }
           if (page > 0)
             body.addView(
-                Screens.button(getContext(), "Ранее", () -> showTurns(Math.max(0, page - 30))));
+                Screens.action(
+                    getContext(),
+                    SettingsGlyph.BACK,
+                    "Ранее",
+                    () -> showTurns(Math.max(0, page - 30))));
           if (items.length() == 30)
-            body.addView(Screens.button(getContext(), "Далее", () -> showTurns(page + 30)));
+            body.addView(
+                Screens.action(
+                    getContext(), SettingsGlyph.CHEVRON, "Далее", () -> showTurns(page + 30)));
         });
   }
 }

@@ -45,8 +45,8 @@ public final class AppShell extends LinearLayout {
     int[] icons = {
       SettingsGlyph.CHAT,
       SettingsGlyph.BOOK,
-      SettingsGlyph.CLOCK,
-      SettingsGlyph.BOOK,
+      SettingsGlyph.BELL,
+      SettingsGlyph.NEWS,
       SettingsGlyph.PALETTE,
       SettingsGlyph.SHIELD
     };
