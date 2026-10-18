@@ -1,0 +1,5 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="local.tvgpt.assistant.tests">
+<uses-sdk android:minSdkVersion="29" android:targetSdkVersion="31"/>
+<application android:label="TV GPT checks"/>
+<instrumentation android:name="local.tvgpt.assistant.DeviceCheck" android:targetPackage="local.tvgpt.assistant" android:label="TV GPT device checks"/>
+</manifest>

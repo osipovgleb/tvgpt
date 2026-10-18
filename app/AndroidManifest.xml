@@ -1,0 +1,38 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="local.tvgpt.assistant" android:versionCode="1" android:versionName="0.1.0">
+ <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="31"/>
+ <uses-permission android:name="android.permission.INTERNET"/>
+ <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+ <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+ <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+ <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+ <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+ <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+ <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"/>
+ <uses-feature android:name="android.hardware.touchscreen" android:required="false"/>
+ <uses-feature android:name="android.software.leanback" android:required="false"/>
+ <application android:extractNativeLibs="true" android:label="TV GPT" android:allowBackup="false" android:icon="@drawable/icon" android:banner="@drawable/banner" android:theme="@android:style/Theme.Material.NoActionBar" android:usesCleartextTraffic="false">
+  <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTask">
+   <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/><category android:name="android.intent.category.LEANBACK_LAUNCHER"/></intent-filter>
+  </activity>
+  <activity android:name=".ConversationActivity" android:exported="false" android:excludeFromRecents="true" android:theme="@android:style/Theme.Material.Dialog.NoActionBar"/>
+  <service android:name=".AssistantService" android:exported="true" android:permission="android.permission.BIND_VOICE_INTERACTION">
+   <intent-filter><action android:name="android.service.voice.VoiceInteractionService"/></intent-filter>
+   <meta-data android:name="android.voice_interaction" android:resource="@xml/assistant"/>
+  </service>
+  <service android:name=".SessionService" android:exported="true" android:permission="android.permission.BIND_VOICE_INTERACTION"/>
+  <service android:name=".AudioKeepAlive" android:exported="false" android:foregroundServiceType="microphone"/>
+  <service android:name=".RecognitionAdapter" android:exported="true" android:permission="android.permission.BIND_SPEECH_RECOGNITION_SERVICE">
+   <intent-filter><action android:name="android.speech.RecognitionService"/></intent-filter>
+  </service>
+  <service android:name=".TvAccessibility" android:exported="true" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+   <intent-filter><action android:name="android.accessibilityservice.AccessibilityService"/></intent-filter>
+   <meta-data android:name="android.accessibilityservice" android:resource="@xml/accessibility"/>
+  </service>
+  <receiver android:name=".reminders.ReminderReceiver" android:exported="false"/>
+  <receiver android:name=".reminders.BootReceiver" android:exported="true"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED"/><action android:name="android.intent.action.TIME_SET"/><action android:name="android.intent.action.TIMEZONE_CHANGED"/></intent-filter></receiver>
+  <service android:name=".DirectInputIme" android:exported="true" android:permission="android.permission.BIND_INPUT_METHOD">
+   <intent-filter><action android:name="android.view.InputMethod"/></intent-filter>
+   <meta-data android:name="android.view.im" android:resource="@xml/direct_input"/>
+  </service>
+ </application>
+</manifest>

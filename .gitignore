@@ -1,0 +1,14 @@
+build/
+.superpowers/
+*.keystore
+*.idsig
+graphify-out/
+
+node_modules/
+
+.aislop/history.jsonl
+
+# Private audio is supplied from outside the repository during local builds.
+app/assets/voice-start.ogg
+app/assets/voice-samples/*.m4a
+__pycache__/

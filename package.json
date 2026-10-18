@@ -1,0 +1,14 @@
+{
+  "name": "tvgpt-development",
+  "private": true,
+  "scripts": {
+    "quality": "python3 scripts/check-architecture.py && aislop scan .",
+    "quality:json": "aislop scan --json .",
+    "test": "bash scripts/test.sh",
+    "format:java": "bash scripts/format-java.sh",
+    "format:check": "bash scripts/format-java.sh --check"
+  },
+  "devDependencies": {
+    "aislop": "0.14.0"
+  }
+}

@@ -1,0 +1,3 @@
+Startup cue: res/raw/listening_start_instant_0db.ogg from the official com.openai.chatgpt app installed on the development TV. OpenAI proprietary asset, used for this personal device prototype at the user request; no open-source license claimed. Extracted 2026-10-18.
+
+The binary is stored outside this source repository. Personal builds may stage it from TVGPT_PRIVATE_ASSETS/voice-start.ogg; it is excluded from public Git history.

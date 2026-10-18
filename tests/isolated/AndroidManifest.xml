@@ -1,0 +1,5 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="local.tvgpt.sectionschecks">
+ <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="31"/>
+ <application android:label="TV GPT isolated data checks" android:allowBackup="false"/>
+ <instrumentation android:name="local.tvgpt.assistant.DataCheck" android:targetPackage="local.tvgpt.sectionschecks" android:label="Isolated SQLite checks"/>
+</manifest>

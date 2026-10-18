@@ -1,0 +1,71 @@
+{
+  "retrieved": "2026-10-18",
+  "language": "ru",
+  "notice": "Official OpenAI proprietary voice preview assets. Bundled at user request for this personal device prototype; no open-source redistribution license claimed. Display-name to source-ID mapping taken from the user-provided ChatGPT voice settings HTML. Preview availability does not prove Live model entitlement.",
+  "samples": [
+    {
+      "voice": "arbor",
+      "source_id": "fathom",
+      "url": "https://persistent.oaistatic.com/voice/previews/fathom.ru.bidibidi.m4a",
+      "bytes": 65043,
+      "sha256": "98ea0eba0fd11a0a20070d0d6ecd2b87c41405ce804d7d6d66bbd2791947d1ae"
+    },
+    {
+      "voice": "breeze",
+      "source_id": "breeze",
+      "url": "https://persistent.oaistatic.com/voice/previews/breeze.ru.bidibidi.m4a",
+      "bytes": 114359,
+      "sha256": "e12f767e2464e5a2743d1fc06c6282681d39974712b1cc8d616955a489c4a6db"
+    },
+    {
+      "voice": "cove",
+      "source_id": "cove",
+      "url": "https://persistent.oaistatic.com/voice/previews/cove.ru.bidibidi.m4a",
+      "bytes": 103916,
+      "sha256": "b9e041124a45b22114b8e25266fdb0b1ee818a402227e537fc13ca769167a60a"
+    },
+    {
+      "voice": "ember",
+      "source_id": "ember",
+      "url": "https://persistent.oaistatic.com/voice/previews/ember.ru.bidibidi.m4a",
+      "bytes": 119910,
+      "sha256": "8446346a08b12d06558bed069a1578d751c62b8646726a1f457d6e1f7261e210"
+    },
+    {
+      "voice": "juniper",
+      "source_id": "juniper",
+      "url": "https://persistent.oaistatic.com/voice/previews/juniper.ru.bidibidi.m4a",
+      "bytes": 86278,
+      "sha256": "f5c90cf3e1247630bb1ce8f7b27710934d1d30633f43687a0f18787ec62c7709"
+    },
+    {
+      "voice": "maple",
+      "source_id": "maple",
+      "url": "https://persistent.oaistatic.com/voice/previews/maple.ru.bidibidi.m4a",
+      "bytes": 80435,
+      "sha256": "7210ad93b6f98f6797016f061daaf3f13e9cdf312c6dc1bbbaca09a473c7d01b"
+    },
+    {
+      "voice": "sol",
+      "source_id": "glimmer",
+      "url": "https://persistent.oaistatic.com/voice/previews/glimmer.ru.bidibidi.m4a",
+      "bytes": 71432,
+      "sha256": "86fce232d254d51939495f4916e8590faf76f0032b75bb3018779528922cbf68"
+    },
+    {
+      "voice": "spruce",
+      "source_id": "orbit",
+      "url": "https://persistent.oaistatic.com/voice/previews/orbit.ru.bidibidi.m4a",
+      "bytes": 91926,
+      "sha256": "9845e395dc23a4626cd743eea8fd9645704cc6bc27d152ae4ad4a88b4e9ac66a"
+    },
+    {
+      "voice": "vale",
+      "source_id": "vale",
+      "url": "https://persistent.oaistatic.com/voice/previews/vale.ru.bidibidi.m4a",
+      "bytes": 81609,
+      "sha256": "6bd63434485e32bac133d03e91b9c18fb70964f7d2ca7df93007217f869c7983"
+    }
+  ],
+  "storage": "Audio binaries are outside the source repository. Personal builds may stage them from TVGPT_PRIVATE_ASSETS/voice-samples; only provenance metadata is public."
+}

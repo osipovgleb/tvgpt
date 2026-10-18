@@ -1,0 +1,10 @@
+version: 1
+engines:
+  format: true
+  lint: true
+  code-quality: true
+  ai-slop: true
+  architecture: true
+  security: true
+telemetry:
+  enabled: false
