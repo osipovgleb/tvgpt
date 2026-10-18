@@ -3,8 +3,8 @@
   "source_commit": "0083d89",
   "scope": "Все шесть разделов TV GPT и их вложенные редакторы; не все меню сторонних приложений.",
   "method": "Каталог извлечён вызовом настоящего AgentTools.all из собранных классов, без AgentFakes. Проверены схемы, маршрутизатор, репозитории и UI callbacks. Аудит кода не является испытанием всех голосовых команд на ТВ.",
-  "catalog_entries": 43,
-  "function_tools": 42,
+  "catalog_entries": 46,
+  "function_tools": 45,
   "states": {
     "direct": "Есть отдельный типизированный инструмент и маршрут исполнения.",
     "missing": "Нет прямой команды для действия, уже доступного UI/репозиторию.",
@@ -133,18 +133,22 @@
     {
       "section": "Напоминания",
       "action": "Изменить текст, дату, время или повтор существующей записи",
-      "state": "missing",
-      "tools": [],
-      "source": "app/src/local/tvgpt/assistant/ui/ReminderEditor.java",
-      "detail": "ReminderRepository.edit существует, но ReminderTools его не вызывает и не объявляет."
+      "state": "direct",
+      "tools": [
+        "reminder_update"
+      ],
+      "source": "app/src/local/tvgpt/assistant/ReminderTools.java",
+      "detail": "Обновление по id/revision; ACTION сохраняется; TIMER изменяется отдельным timer_update."
     },
     {
       "section": "Напоминания",
       "action": "Удалить запись из списка",
-      "state": "missing",
-      "tools": [],
-      "source": "app/src/local/tvgpt/assistant/ui/RemindersScreen.java",
-      "detail": "ReminderRepository.delete доступен UI. Отмена выключает запись, но не удаляет её."
+      "state": "direct",
+      "tools": [
+        "reminder_delete"
+      ],
+      "source": "app/src/local/tvgpt/assistant/ReminderTools.java",
+      "detail": "Атомарное удаление по id/revision, запрет delivering, подтверждение отсутствия строки."
     },
     {
       "section": "Дайджесты",
@@ -434,6 +438,16 @@
       ],
       "source": "app/src/local/tvgpt/assistant/Agent.java",
       "detail": "Маршрут существует; семантическое делегирование Live не считается проверенным одним наличием инструмента."
+    },
+    {
+      "section": "Напоминания",
+      "action": "Изменить длительность или текст таймера",
+      "state": "direct",
+      "tools": [
+        "timer_update"
+      ],
+      "source": "app/src/local/tvgpt/assistant/ReminderTools.java",
+      "detail": "seconds=0 сохраняет срок; seconds>0 сбрасывает отсчёт в той же TIMER-записи."
     }
   ],
   "findings": [
@@ -441,13 +455,17 @@
       "id": "reminder-dispatch-fallthrough",
       "kind": "dispatch-risk",
       "source": "app/src/local/tvgpt/assistant/ReminderTools.java",
-      "detail": "Неизвестное имя после reminder_list/reminder_cancel попадает в ветку создания. Внешний каталог таких имён не объявляет, но обработчик должен явно отклонять неподдерживаемые команды. Фактический ошибочный вызов здесь не доказан."
+      "detail": "Неизвестное имя после reminder_list/reminder_cancel попадает в ветку создания. Внешний каталог таких имён не объявляет, но обработчик должен явно отклонять неподдерживаемые команды. Фактический ошибочный вызов здесь не доказан.",
+      "state": "fixed",
+      "resolution": "Явный список поддерживаемых имён отклоняет неизвестную команду до доступа к базе; проверено тестом настоящего ReminderTools."
     },
     {
       "id": "data-screen-refresh",
       "kind": "observable-gap",
       "source": "app/src/local/tvgpt/assistant/ui/",
-      "detail": "KnowledgeScreen и RemindersScreen не подписаны на изменения данных. DigestsScreen слушает DIGEST_CHANGED, отправляемый DigestAssembler после сборки; изменение конфигурации через DigestCommands само его не отправляет. Поэтому успешное голосовое изменение может не сразу отобразиться в уже открытом экране."
+      "detail": "KnowledgeScreen и RemindersScreen не подписаны на изменения данных. DigestsScreen слушает DIGEST_CHANGED, отправляемый DigestAssembler после сборки; изменение конфигурации через DigestCommands само его не отправляет. Поэтому успешное голосовое изменение может не сразу отобразиться в уже открытом экране.",
+      "state": "implemented",
+      "resolution": "AppDataEvents после успешных голосовых изменений; AsyncScreen подписывает знания, напоминания и дайджесты. События объединяются, фокус сохраняется по ключу карточки. Android-проверка ниже фиксируется отдельно."
     },
     {
       "id": "settings-orb-contract",
@@ -463,9 +481,10 @@
     }
   ],
   "priority": [
-    "reminder_edit и reminder_delete с revision/cancellation и проверкой результата",
     "Общий безопасный app_open_section и описание реальных возможностей помощнику",
     "settings_read и типизированные изменения настроек с каталогами и проверкой голоса; без произвольных prefs/Intent/shell",
     "Повтор описания разговора и обновление уже открытых списков после голосовых изменений"
-  ]
+  ],
+  "reconciled_after_commit": "7fe6799",
+  "reconciliation": "Добавлены reminder_update, timer_update, reminder_delete и обновление списков; остальные пункты аудита сохраняют прежний статус."
 }

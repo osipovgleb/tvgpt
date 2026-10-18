@@ -10,6 +10,7 @@ import org.json.*;
 public final class KnowledgeScreen extends AsyncScreen {
   public KnowledgeScreen(Context c) {
     super(c, "Общие знания");
+    observeData(local.tvgpt.assistant.AppDataEvents.KNOWLEDGE, this::refresh);
     refresh();
   }
 
@@ -31,12 +32,13 @@ public final class KnowledgeScreen extends AsyncScreen {
             JSONObject n = notes.optJSONObject(i);
             body.addView(
                 new LibraryCard(
-                    getContext(),
-                    SettingsGlyph.BOOK,
-                    n.optString("title"),
-                    n.optString("text"),
-                    "",
-                    () -> edit(n)));
+                        getContext(),
+                        SettingsGlyph.BOOK,
+                        n.optString("title"),
+                        n.optString("text"),
+                        "",
+                        () -> edit(n))
+                    .withKey("knowledge:" + n.optLong("id")));
           }
         });
   }

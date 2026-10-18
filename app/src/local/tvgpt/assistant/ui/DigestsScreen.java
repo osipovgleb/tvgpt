@@ -26,6 +26,7 @@ public final class DigestsScreen extends AsyncScreen {
   public DigestsScreen(Context c, String id) {
     super(c, "");
     selected = id == null ? "" : id;
+    observeData(AppDataEvents.DIGESTS, this::refresh);
     refresh();
   }
 
@@ -121,15 +122,16 @@ public final class DigestsScreen extends AsyncScreen {
         JSONObject d = digests.optJSONObject(i);
         body.addView(
             new LibraryCard(
-                getContext(),
-                SettingsGlyph.NEWS,
-                d.optString("title"),
-                d.optString("topics"),
-                "",
-                () -> {
-                  selected = d.optString("id");
-                  refresh();
-                }));
+                    getContext(),
+                    SettingsGlyph.NEWS,
+                    d.optString("title"),
+                    d.optString("topics"),
+                    "",
+                    () -> {
+                      selected = d.optString("id");
+                      refresh();
+                    })
+                .withKey("digest:" + d.optString("id")));
       }
     body.addView(
         Screens.action(

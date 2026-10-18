@@ -50,6 +50,11 @@ public final class LibraryCard extends LinearLayout {
     setOnClickListener(v -> action.run());
   }
 
+  public LibraryCard withKey(String key) {
+    setTag(key);
+    return this;
+  }
+
   static TextView label(Context c, String text, int size, int colour, int lines) {
     TextView label = Screens.text(c, text, size);
     label.setPadding(0, 0, 0, 0);

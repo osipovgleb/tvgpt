@@ -88,6 +88,7 @@ public final class ConversationsScreen extends AsyncScreen {
                       summaryFailed = item.optString("summary_state").equals("failed");
                       showTurns(0);
                     });
+            card.withKey("conversation:" + id);
             GridLayout.LayoutParams placement =
                 new GridLayout.LayoutParams(GridLayout.spec(i / 2), GridLayout.spec(i % 2, 1f));
             placement.width = 0;

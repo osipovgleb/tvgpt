@@ -43,24 +43,7 @@ public final class DigestCommands {
       case "digest_mutate":
       case "digest_source_mutate":
       case "digest_schedule_mutate":
-        {
-          String kind =
-              tool.equals("digest_mutate")
-                  ? "digest"
-                  : tool.equals("digest_source_mutate") ? "source" : "schedule";
-          JSONObject data = new JSONObject(args.toString());
-          data.remove("operation_id");
-          data.remove("expected_revision");
-          if (args.getString("action").equals("create"))
-            data.put(
-                "zone",
-                new local.tvgpt.assistant.settings.GeneralPreferences(context).zone().getId());
-          JSONObject result =
-              repo.mutate(
-                  args.getString("operation_id"), kind, data, args.getLong("expected_revision"));
-          DigestScheduler.reconcile(context);
-          return result;
-        }
+        return mutate(repo, tool, args);
       case "digest_refresh":
         {
           JSONObject result =
@@ -71,6 +54,7 @@ public final class DigestCommands {
                   0,
                   System.currentTimeMillis());
           DigestScheduler.reconcile(context);
+          AppDataEvents.changed(context, AppDataEvents.DIGESTS);
           return status(result);
         }
       case "digest_cover_generate":
@@ -82,6 +66,7 @@ public final class DigestCommands {
                   args.getString("article_id"),
                   args.getString("prompt"));
           DigestScheduler.reconcile(context);
+          AppDataEvents.changed(context, AppDataEvents.DIGESTS);
           return status(result);
         }
       case "digest_open":
@@ -103,6 +88,25 @@ public final class DigestCommands {
       default:
         throw new IllegalArgumentException("Неизвестный инструмент");
     }
+  }
+
+  private JSONObject mutate(DigestRepository repo, String tool, JSONObject args) throws Exception {
+    String kind =
+        tool.equals("digest_mutate")
+            ? "digest"
+            : tool.equals("digest_source_mutate") ? "source" : "schedule";
+    JSONObject data = new JSONObject(args.toString());
+    data.remove("operation_id");
+    data.remove("expected_revision");
+    if (args.getString("action").equals("create"))
+      data.put(
+          "zone", new local.tvgpt.assistant.settings.GeneralPreferences(context).zone().getId());
+    JSONObject result =
+        repo.mutate(args.getString("operation_id"), kind, data, args.getLong("expected_revision"));
+    DigestScheduler.reconcile(context);
+    if (result.optString("status").equals("saved") || result.optString("status").equals("deleted"))
+      AppDataEvents.changed(context, AppDataEvents.DIGESTS);
+    return result;
   }
 
   private JSONObject status(JSONObject job) throws Exception {
