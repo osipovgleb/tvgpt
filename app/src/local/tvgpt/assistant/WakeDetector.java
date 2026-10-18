@@ -157,10 +157,12 @@ final class WakeDetector {
           }
           samples += count / 2;
           boolean finalResult = recognizer.acceptWaveForm(bytes, count);
-          JSONObject result =
-              new JSONObject(finalResult ? recognizer.getResult() : recognizer.getPartialResult());
-          if (WakePhrase.matches(result.optString(finalResult ? "text" : "partial"))) {
-            Log.i("TVGPTWake", "Wake phrase recognized after samples=" + samples);
+          // Partial hypotheses can briefly resemble the wake phrase during unrelated speech.
+          // Never consume the wake ticket until the recognizer has finalized the utterance.
+          if (!finalResult) continue;
+          JSONObject result = new JSONObject(recognizer.getResult());
+          if (WakePhrase.matches(result.optString("text"))) {
+            Log.i("TVGPTWake", "Final wake phrase recognized after samples=" + samples);
             if (recovery.consume(ticket)) {
               releaseCapture();
               wake.run();

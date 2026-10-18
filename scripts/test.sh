@@ -108,7 +108,7 @@ done
 bash scripts/test-data-repair.sh
 bash scripts/test-tv-actions.sh
 "$TVGPT_JAVA/javac" -cp "$TVGPT_TOOLCHAIN/android-35/android.jar:build/deps/json-test.jar" -d build/wake-test $(find tests/wake-stubs -name '*.java') app/src/local/tvgpt/assistant/{WakeDetector,WakeRecovery,WakePhrase}.java tests/WakeDetectorRecoveryTest.java
-"$TVGPT_JAVA/java" -cp "build/wake-test:$TVGPT_TOOLCHAIN/android-35/android.jar:build/deps/json-test.jar" local.tvgpt.assistant.WakeDetectorRecoveryTest
+"$TVGPT_JAVA/java" -cp "build/wake-test:build/deps/json-test.jar:$TVGPT_TOOLCHAIN/android-35/android.jar" local.tvgpt.assistant.WakeDetectorRecoveryTest
 
 bash scripts/test-digest-cancellation.sh
 

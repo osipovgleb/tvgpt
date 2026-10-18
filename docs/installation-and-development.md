@@ -101,3 +101,18 @@ Device check on 18 October: common helper, without manufacturer matching, observ
 27→30→27; injected Android KEYCODE_VOLUME_UP produced no new CEC packet on this TCL. The physical
 remote's existing raw-input bridge was left unchanged. This confirms the external backend here,
 not compatibility with every TV or IR-controlled audio system.
+
+### Unexpected voice invocation
+
+Inspect `TVGPTWake` together with `TVGPTSession show source=…` before attributing an unexpected
+opening to a remote key or service restart. On 18 October the captured opening at 17:31:38 had
+`source=wake`. The older log did not distinguish partial from final recognition, so it cannot
+prove which hypothesis triggered that particular opening.
+
+The local detector now accepts finalized utterances only. Partial hypotheses are never sufficient
+to start Live, even if they temporarily contain the complete wake phrase. The final event is logged
+explicitly without storing microphone audio. This preserves the existing single native recorder and
+capture format. It can add endpointing latency and does not guarantee rejection of TV audio that
+is itself finalized as the wake phrase. The recovery regression exercises partial match → corrected
+non-match → final match, checking zero early starts and one final invocation. Acoustic false-positive
+rate still needs on-device observation; the host test does not measure it.

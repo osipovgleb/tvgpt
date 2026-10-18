@@ -31,7 +31,7 @@ public class AudioRecord {
 
   public int read(byte[] bytes, int offset, int size, int mode) {
     if (released) throw new AssertionError("read after release");
-    return 0;
+    return org.vosk.Recognizer.frames.isEmpty() ? 0 : size;
   }
 
   public void stop() {}
