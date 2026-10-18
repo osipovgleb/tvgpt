@@ -35,7 +35,7 @@
 ## Native app sections
 
 - UI source of truth: `docs/ui/interface-contract.md`; development/install runbook: `docs/installation-and-development.md`. Read these before UI or setup changes and update them with user-approved changes.
-- Approved sidebar: Conversations / Shared knowledge / Reminders / Assistant settings (Appearance and Voice groups) / Settings (internal ACCESS route). No Home or Settings wrapper. Voice, colour and model choices belong in Assistant settings; background ducking and timezone belong in Settings. Left/right changes the focused setting. Sidebar is180dp, compact42dp rows, distinct background with no vertical divider; focus differs from selection. MainActivity routes; feature screens and repositories own their content.
+- Approved sidebar: Conversations / Shared knowledge / Reminders / Digests / Assistant settings (Appearance and Voice groups) / Settings (internal ACCESS route). No Home or Settings wrapper. Voice, colour and model choices belong in Assistant settings; background ducking and timezone belong in Settings. Left/right changes the focused setting. Sidebar is180dp, compact42dp rows, distinct background with no vertical divider; focus differs from selection. MainActivity routes; feature screens and repositories own their content.
 - No repeated section heading or permanent instruction/footer text in the content pane. Appearance and Settings must use shared SettingsRows, extracted exactly from the original Access screen, with internal separators and icons.
 - Date/time must be usable with D-pad alone: year/month horizontal fields plus day calendar, independent hour/minute rows, all inline in one reminder sheet. Repeat is horizontal; weekdays are round toggles, never nested date/time dialogs. Store the app timezone once in Settings → General; preserve existing reminder zones.
 - Discussion, summary and Live models are separate saved settings. Use subscription catalog IDs; a text catalog does not prove additional Live models are available. Preserve working defaults on catalog failure, and key voice samples by Live model.
@@ -64,3 +64,11 @@
 - AudioDucking owns automatic background attenuation for the duration of a call, independent of model tools. Reclaim lost focus with bounded delayed retries; never retry after close. The explicit mute tool is only for a user request to mute the whole TV, not background attenuation. On-device system ducking succeeded without root; no shared stream-volume change.
 
 - On this TCL install updates only with `adb install --no-incremental -r`. Incremental installation reported success then PackageInstallerSession.onSystemDataLoaderUnrecoverable fully removed the app and data on18 October. Verify package UID/account retention and bindings after streamed updates; never uninstall or clear data as a repair step.
+
+## Combined public preview0.1.1
+
+- The sidebar has six sections including Digests; preserve it when importing older development changes.
+- EndPhrase/SpeechStop were removed. Do not reintroduce deterministic multilingual farewell matching, a second ASR or another Live session. Live decides the intent; the current existing executor exposes end_conversation. Closing reliability is an open issue; this supersedes obsolete local-phrase notes above.
+- TCL startup repair is package-scoped: detect APP_AUTO_START/APP_ASSOC_START and verify allow. Optional OEM probes must not abort setup on unknown operations. TGuard runtime kill exemption is detected/read back and attempted once per process through paired local ADB; never disable the global cleaner or claim reboot permanence.
+- Clear a disconnected accessibility instance at unbind. BadTokenException during orb attachment falls back to the existing system voice window after cleanup, without starting a duplicate voice call.
+- Keep private development Git history off public refs. Publish sanitized source on public history; public builds must explicitly use an empty external TVGPT_PRIVATE_ASSETS directory, because normal personal builds stage home-directory assets by default.
