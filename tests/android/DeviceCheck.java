@@ -546,15 +546,17 @@ public class DeviceCheck extends Instrumentation {
           android.os.SystemClock.sleep(100);
         }
         if (VoicePanel.active == null) throw new Exception("No Live panel");
+        String goodbyeEvent =
+            new JSONObject()
+                .put("type", "turn.done")
+                .put(
+                    "turn",
+                    new JSONObject()
+                        .put("role", "user")
+                        .put("transcript", args.getString("goodbye", "Заверши голосовой чат")))
+                .toString();
         long start = android.os.SystemClock.elapsedRealtime();
-        runOnMainSync(
-            () ->
-                VoicePanel.active.injectTestEvent(
-                    mode.equals("partial-close-ui")
-                        ? "{\"type\":\"input_transcript.added\",\"item\":{\"text\":\"Заверши"
-                            + " голосовой чат\"}}"
-                        : "{\"type\":\"turn.done\",\"turn\":{\"role\":\"user\",\"transcript\":\"Заверши"
-                              + " голосовой чат\"}}"));
+        runOnMainSync(() -> VoicePanel.active.injectTestEvent(goodbyeEvent));
         deadline = start + 2000;
         while (VoicePanel.active != null && android.os.SystemClock.elapsedRealtime() < deadline)
           android.os.SystemClock.sleep(10);

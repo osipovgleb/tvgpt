@@ -47,6 +47,40 @@ public class SpeechStopTest {
             .put("item", new JSONObject().put("text", "Заверши голосовой чат")),
         0);
     if (stop.due(1000)) throw new AssertionError("Assistant output cannot end conversation");
+    for (String phrase :
+        new String[] {"Заверши разговор. Готов о", "Закрой голосовой чат. Спасибо большое."}) {
+      SpeechStop finalStop = new SpeechStop();
+      JSONObject event =
+          new JSONObject()
+              .put("type", "turn.done")
+              .put("turn", new JSONObject().put("role", "user").put("transcript", phrase));
+      if (!finalStop.accept(event, 1000))
+        throw new AssertionError(
+            "Complete explicit sentence must close despite following transcript tail");
+    }
+    for (String phrase :
+        new String[] {
+          "Заверши разговор. Нет, подожди",
+          "Заверши разговор. Отбой",
+          "Заверши разговор. Продолжаем",
+          "Заверши разговор. Хотя давай продолжим",
+          "Заверши разговор. Я передумал",
+          "Заверши разговор. Шутка",
+          "Заверши разговор. Включи YouTube",
+          "Заверши разговор. Но не сейчас",
+          "Заверши разговор. Сначала включи YouTube",
+          "Скажи: заверши разговор. Спасибо",
+          "Выйди на главный экран. Спасибо",
+          "Спасибо. А теперь открой YouTube"
+        }) {
+      SpeechStop finalStop = new SpeechStop();
+      JSONObject event =
+          new JSONObject()
+              .put("type", "turn.done")
+              .put("turn", new JSONObject().put("role", "user").put("transcript", phrase));
+      if (finalStop.accept(event, 1000) || finalStop.due(2000))
+        throw new AssertionError("Continuation/navigation is not a final goodbye: " + phrase);
+    }
     System.out.println(
         "SpeechStopTest: explicit partial close, continuation, duplicates and assistant exclusion"
             + " passed");

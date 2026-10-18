@@ -56,6 +56,22 @@ final class EndPhrase {
             "(?:ну |ладно |хорошо )?(?:все|на этом все)(?: наверное)?(?: спасибо(?: большое)?)?");
   }
 
+  static boolean finalTranscript(String text) {
+    if (matches(text)) return true;
+    if (text == null) return false;
+    String[] sentences = text.split("[.!;…]+", 2);
+    if (sentences.length != 2 || !explicit(sentences[0])) return false;
+    String command = normalized(sentences[0]);
+    if (!command.matches("(?:заверши|завершить|закрой|закончи|выключи|останови|отключись)(?: .*)?"))
+      return false;
+    // A second request or a retraction is ambiguous; only neutral closing acknowledgements qualify.
+    String tail = normalized(sentences[1]).replace(" ", "");
+    return tail.isEmpty()
+        || (tail.length() <= 80
+            && tail.matches(
+                "(?:(?:готово|все|спасибо|большое|хорошо|да|ага|ладно|окей|пока|досвидания)){1,4}"));
+  }
+
   static boolean explicit(String text) {
     String words = normalized(text);
     return matches(text) && !words.equals("спасибо") && !words.equals("все");

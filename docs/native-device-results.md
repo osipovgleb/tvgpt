@@ -169,3 +169,25 @@ Balanced identical-output subscription probes show Fast generation about1.6–1.
 After a reported-success incremental update, PackageInstallerSession invoked onSystemDataLoaderUnrecoverable and deletePackageX; ACTION_PACKAGE_FULLY_REMOVED followed at09:12:31. The package disappeared and its UID changed10118→10161 after a streamed reinstall. App data/account and local ADB trust were reset. No uninstall or clear-data command was issued by this task. The app was restored using install --no-incremental -r; assistant/accessibility bindings and RECORD_AUDIO grant were restored. Require streamed installation on this firmware from now on. This later installer failure is separate from the earlier local goodbye timer closure.
 
 Background Spotify integration check reached the local ADB authorization boundary and did not pass: the newly generated on-device key requires TV authorization. Therefore background play/pause, Watch Later batch navigation and post-update Live speech are pending recovery of pairing/account. Do not call those verified from host tests or the prior Fast benchmark. Previously saved bounded audit files preserve evidence, not a complete restorable app archive.
+
+
+###18 October09:18–09:22: account and remote recovered, background media passed
+
+User re-added TV GPT to VPN and completed device-code login; UI showed connected. AssistantService/TvAccessibility were bound to the restored app process; Katniss remained disabled. Local ADB initially had a pending authorization prompt and became usable after restarting the existing TCP5555 listener; the settings row confirmed connection. Fast was enabled in settings (Fast requested), discussion gpt-6.1-sol, reasoning Auto, Live gpt-live-1-codex. No additional production APK update or account reset occurred.
+
+Spotify's stale inactive session first rejected background play, correctly without a success claim. After preparing actual playback in Spotify and leaving it, the real app's background-media check passed background_play_observed, background_pause_observed, foreground_preserved and already_paused_not_repeated. Spotify was left paused. This verifies tool execution through the app's local ADB connection without opening Spotify for those actions; it is distinct from a spoken Live delegation test.
+
+Ordinary system ASSIST invocation connected Live in about3 seconds, with session.started and native audio events; no check prompt was injected. Human speech/heard-answer/close confirmation is recorded separately after the pending user test. The TV music stream was muted before that test; the user was asked to restore comfortable listening volume rather than changing their saved98/100 volume automatically.
+
+
+###18 October09:22–09:28: precise long-close cause and regression fix
+
+User confirmed the ordinary cold call answered, but ending took too long. Saved final turns showed the actual final user transcript `Заверши разговор. Готов о`, then Live said it was ending without emitting the local close delegation. Exact whole-utterance matching rejected the explicit command because of the following acknowledgement; this was not slow native teardown.
+
+EndPhrase.finalTranscript now recognizes a complete first explicit close-command sentence only when the remaining final transcript is a bounded neutral closing acknowledgement (word spacing is normalized). Retractions or additional requests are not accepted; partial450ms detection stays exact. Host regression covers the observed transcript, neutral thanks, отбой/продолжаем/передумал/шутка/additional action/negation and Home navigation. Microphone configuration, startup/context and summary workers are unchanged.
+
+On-device close-ui replay of that exact final user transcript logged final_user_goodbye without an Agent round: local_close_ms313; microphone mute immediately, native media release142ms; remote_paired=true. The same legacy check's subsequent rapid double-Back assertion failed, so the combined instrumentation result is not recorded as a full pass. It does not invalidate the independently reported close/remote assertions and logs; actual Back behavior requires a separate event-loop-aware check. Test package removed, normal bindings restored. A fresh ordinary system-assist call connected again in about3.3seconds; awaiting final human speech/close confirmation.
+
+Host suite and ARM32/test APK builds passed. Quality95/100,0errors,5 intentional canonical subscription URL warnings. Streamed update preserved UID10161 and the logged-in account; original private startup OGG in the installed build matches its external source hash.
+
+Follow-up normal call (no injected events/check prompt):09:28:44.044 stable_partial_goodbye requested local close, microphone muted09:28:44.071, media released399ms later, system hide09:28:44.973. Native input/output transcript events occurred in this call. This confirms the ordinary closing path; the explicit human heard-answer/speed response to the pending prompt has not yet arrived.

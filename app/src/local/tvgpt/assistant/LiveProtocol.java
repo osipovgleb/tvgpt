@@ -29,7 +29,7 @@ final class LiveProtocol {
     return event.optString("type").equals("turn.done")
         && turn != null
         && turn.optString("role").equals("user")
-        && EndPhrase.matches(turn.optString("transcript"));
+        && EndPhrase.finalTranscript(turn.optString("transcript"));
   }
 
   static JSONObject userInput(String text) throws Exception {
