@@ -116,3 +116,13 @@ capture format. It can add endpointing latency and does not guarantee rejection 
 is itself finalized as the wake phrase. The recovery regression exercises partial match → corrected
 non-match → final match, checking zero early starts and one final invocation. Acoustic false-positive
 rate still needs on-device observation; the host test does not measure it.
+
+### Не открывать приложение после обычного обновления
+
+По уточнению пользователя 18 октября: обновление не должно переключать просмотр на TV GPT.
+`connect-tv.py TV_SERIAL` по умолчанию проверяет уже работающие привязки без `am start`.
+Если привязки отсутствуют, он завершается с ошибкой, сохраняя их и текущий экран; это не
+успешное восстановление. `--foreground` разрешает прежнюю процедуру с открытием настроек,
+но используется только в отдельном согласованном окне настройки/восстановления. Не запускать
+MainActivity и не переключать разделы ради проверки во время просмотра. Для обычной проверки
+использовать журналы, UID/хеш APK и состояние bound services.

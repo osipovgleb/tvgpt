@@ -100,6 +100,7 @@ mkdir -p build/digest-db-test
 "$TVGPT_JAVA/java" -cp build/test:build/deps/json-test.jar local.tvgpt.assistant.RemoteSequenceTest
 
 python3 tests/test_prepare_assets.py
+python3 tests/test_connect_tv.py
 
 "$TVGPT_JAVA/javac" -cp build/deps/json-test.jar -d build/test app/src/local/tvgpt/assistant/{CancellationToken,CallContext,TaskHarness,TaskEvidence,LiveProtocol,LiveDelivery,Http,RefreshFlight,WakeRecovery,VoicePreflight}.java app/src/local/tvgpt/assistant/voice/ClosingWork.java tests/{CancellationTokenTest,CallContextTest,TaskHarnessTest,TaskEvidenceTest,LiveDeliveryTest,HttpCancellationTest,AuthVoiceLifecycleTest,VoiceQueuePreflightTest}.java
 for test in CancellationTokenTest CallContextTest TaskHarnessTest TaskEvidenceTest LiveDeliveryTest HttpCancellationTest AuthVoiceLifecycleTest VoiceQueuePreflightTest; do

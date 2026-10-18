@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """Rebind this app after an APK update; preserve unrelated accessibility services."""
-import os,re,shlex,subprocess,sys,time
+import argparse,os,re,shlex,subprocess,time
 adb=os.environ.get('ADB','/home/gleb/.local/share/android/platform-tools/adb')
-serial=sys.argv[1] if len(sys.argv)>1 else '192.168.3.5:5555'
+parser=argparse.ArgumentParser(description='Check bindings without opening the app; explicit --foreground permits setup/rebinding.')
+parser.add_argument('serial',nargs='?',default='192.168.3.5:5555')
+parser.add_argument('--foreground',action='store_true',help='Allow opening settings and rebinding during an authorized setup window')
+options=parser.parse_args()
+serial=options.serial
 def shell(*args):
  return subprocess.check_output([adb,'-s',serial,'shell',shlex.join(args)],text=True).strip()
 def bound_services():
@@ -23,9 +27,11 @@ if startup_changed:shell('cmd','appops','write-settings')
 component='local.tvgpt.assistant/.AssistantService'
 if (shell('settings','get','secure','assistant')==component
     and shell('settings','get','secure','voice_interaction_service')==component and bound_services()):
- shell('am','start','-n','local.tvgpt.assistant/.MainActivity','--es','section','SETTINGS')
- print('TV GPT assistant and accessibility already bound; existing bindings preserved.')
+ if options.foreground:shell('am','start','-n','local.tvgpt.assistant/.MainActivity','--es','section','SETTINGS')
+ print('TV GPT assistant and accessibility already bound; existing bindings preserved; no automatic screen switch.')
  raise SystemExit(0)
+if not options.foreground:
+ raise SystemExit('Bindings are not ready. No app window was opened and bindings were left intact. Use --foreground only during an authorized setup window.')
 # Never cancel a newly queued foreground start during an APK handover: TCL can retain its timeout.
 for attempt in range(40):
  service=shell('dumpsys','activity','services','local.tvgpt.assistant/.AudioKeepAlive')
