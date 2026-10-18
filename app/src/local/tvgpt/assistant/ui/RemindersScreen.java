@@ -66,8 +66,10 @@ public final class RemindersScreen extends AsyncScreen {
                                       () -> {
                                         ReminderRepository repo =
                                             new ReminderRepository(getContext());
-                                        if (which == 1) repo.cancel(n.optLong("id"));
-                                        else repo.delete(n.optLong("id"));
+                                        if (which == 1 && !repo.cancel(n.optLong("id")))
+                                          throw new IllegalStateException(
+                                              "Напоминание уже выполняется или завершено");
+
                                         AlarmScheduler.reconcile(getContext());
                                         return true;
                                       },
@@ -86,6 +88,8 @@ public final class RemindersScreen extends AsyncScreen {
         return "Ждёт включения ТВ";
       case "delivering":
         return "Выполняется";
+      case "notified":
+        return "Уведомление отправлено";
       case "completed":
         return "Выполнено";
       case "unconfirmed":

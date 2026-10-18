@@ -26,6 +26,7 @@ public final class AppearanceScreen extends LinearLayout {
 
   public AppearanceScreen(Context c) {
     super(c);
+    ModelSettings.digests(c);
     prefs = new AssistantPreferences(c);
     samples = new VoiceSamples(c);
     voiceIndex = Math.max(0, voices.indexOf(prefs.voice()));
@@ -76,6 +77,14 @@ public final class AppearanceScreen extends LinearLayout {
         },
         false);
     modelRows(c, group);
+    LinearLayout digestGroup = new SettingsRows(c).group(groups, "Дайджесты");
+    option(
+        digestGroup,
+        SettingsGlyph.BOOK,
+        "Модель дайджестов",
+        () -> ModelSettings.digests(c),
+        d -> cycleModel("digests", d),
+        false);
     ModelCatalogue.load(
         c,
         json -> {
@@ -145,7 +154,9 @@ public final class AppearanceScreen extends LinearLayout {
             ? ModelSettings.live(getContext())
             : kind.equals("summary")
                 ? ModelSettings.summary(getContext())
-                : ModelSettings.discussion(getContext());
+                : kind.equals("digests")
+                    ? ModelSettings.digests(getContext())
+                    : ModelSettings.discussion(getContext());
     List<String> options = ModelOptions.parse(modelCatalog, kind.equals("live"), current);
     ModelSettings.set(
         getContext(),

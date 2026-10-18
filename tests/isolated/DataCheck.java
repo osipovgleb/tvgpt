@@ -19,7 +19,12 @@ public final class DataCheck extends Instrumentation {
   public void onStart() {
     Bundle out = new Bundle();
     try {
-      if (mode.equals("preferences")) {
+      if (mode.equals("digest-model")) {
+        ModelSettingsChecks.run(getTargetContext(), out);
+      } else if (mode.equals("digests")) {
+        DigestDataChecks.run(getTargetContext(), out);
+        local.tvgpt.assistant.digests.DigestCoverChecks.run(getTargetContext(), out);
+      } else if (mode.equals("preferences")) {
         getTargetContext()
             .getSharedPreferences("appearance_audio", 0)
             .edit()

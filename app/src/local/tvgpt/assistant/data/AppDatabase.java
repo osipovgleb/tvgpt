@@ -12,7 +12,7 @@ public final class AppDatabase extends SQLiteOpenHelper {
   }
 
   private AppDatabase(Context c) {
-    super(c, "assistant.db", null, 2);
+    super(c, "assistant.db", null, 3);
     setWriteAheadLoggingEnabled(true);
   }
 
@@ -23,6 +23,7 @@ public final class AppDatabase extends SQLiteOpenHelper {
 
   @Override
   public void onCreate(SQLiteDatabase db) {
+    DigestSchema.create(db);
     db.execSQL("CREATE TABLE imports (workspace TEXT PRIMARY KEY)");
     db.execSQL(
         "CREATE TABLE conversations (id TEXT PRIMARY KEY, started INTEGER NOT NULL, ended INTEGER"
@@ -56,6 +57,7 @@ public final class AppDatabase extends SQLiteOpenHelper {
       db.execSQL("ALTER TABLE reminders ADD COLUMN last_status TEXT NOT NULL DEFAULT ''");
       db.execSQL("ALTER TABLE reminders ADD COLUMN last_delivery INTEGER NOT NULL DEFAULT 0");
     }
-    if (newVersion > 2) throw new IllegalStateException("Unknown database migration");
+    if (oldVersion < 3) DigestSchema.create(db);
+    if (newVersion > 3) throw new IllegalStateException("Unknown database migration");
   }
 }

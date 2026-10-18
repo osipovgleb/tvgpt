@@ -140,7 +140,8 @@ public final class NativeWebRtcTransport implements VoiceTransport {
           muted = value;
           if (microphone != null) microphone.setEnabled(!value);
           if (audio != null) audio.setMuted(value);
-        });
+        },
+        value);
   }
 
   public void close(Runnable released) {
@@ -157,6 +158,15 @@ public final class NativeWebRtcTransport implements VoiceTransport {
   }
 
   private void releaseResources() {
+    // Closing also mutes first when no separate UI mute was queued.
+    release(
+        () -> {
+          if (microphone != null) microphone.setEnabled(false);
+        });
+    release(
+        () -> {
+          if (audio != null) audio.setMuted(true);
+        });
     if (stats != null) stats.cancel(false);
     if (disconnect != null) disconnect.cancel(false);
     if (setupTimeout != null) setupTimeout.cancel(false);
@@ -207,17 +217,23 @@ public final class NativeWebRtcTransport implements VoiceTransport {
   }
 
   private void submit(Runnable operation) {
+    submit(operation, false);
+  }
+
+  private void submit(Runnable operation, boolean duringClose) {
     if (closed.get()) return;
-    WORKER.execute(
+    ClosingWork.submit(
+        WORKER,
+        closed::get,
         () -> {
-          if (closed.get()) return;
           try {
             operation.run();
           } catch (RuntimeException | LinkageError failure) {
             Log.w("TVGPTAudio", "Native transport: " + failure.getClass().getSimpleName());
             fail("Не удалось запустить нативный голосовой канал");
           }
-        });
+        },
+        duringClose);
   }
 
   private void fail(String message) {

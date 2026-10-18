@@ -39,13 +39,23 @@ public final class ConversationSummarizer {
       if (revision == conversation.optLong("summary_revision")) return;
       JSONArray turns = repo.tail(id, 60);
       if (turns.length() == 0) return;
-      StringBuilder input = new StringBuilder();
-      for (int i = 0; i < turns.length(); i++) {
+      // Spend the budget on the newest decisions, then restore chronological order.
+      java.util.Deque<String> selected = new java.util.ArrayDeque<>();
+      int remaining = 12000;
+      for (int i = turns.length() - 1; i >= 0 && remaining > 0; i--) {
         JSONObject t = turns.getJSONObject(i);
-        String line = t.optString("role") + ": " + t.optString("text") + "\n";
-        if (input.length() + line.length() > 12000) break;
-        input.append(line);
+        String prefix = t.optString("role") + ": ";
+        String text = t.optString("text");
+        if (text.trim().isEmpty()) continue;
+        if (remaining <= prefix.length() + 1) break;
+        int available = remaining - prefix.length() - 1;
+        if (text.length() > available) text = text.substring(text.length() - available);
+        String line = prefix + text + "\n";
+        selected.addFirst(line);
+        remaining -= line.length();
       }
+      String input = String.join("", selected);
+      if (input.trim().isEmpty()) return;
       JSONObject account = new AccountStore(c).fresh();
       JSONObject request =
           new JSONObject()

@@ -7,12 +7,37 @@ import org.json.JSONObject;
 
 final class TvTools {
   private final Context context;
+  private final CancellationToken token;
 
   TvTools(Context c) {
+    this(c, CancellationToken.NONE);
+  }
+
+  TvTools(Context c, CancellationToken token) {
     context = c;
+    this.token = token;
   }
 
   String execute(String name, JSONObject args) throws Exception {
+    token.check();
+    // Pin current-app search once; execution and observation share the same package.
+    if (name.equals("search_app")) {
+      args = new JSONObject(args.toString());
+      String requested = args.optString("name").trim();
+      if (requested.isEmpty()
+          || requested.equalsIgnoreCase("current")
+          || requested.equalsIgnoreCase("текущее приложение")) {
+        args.put(
+            "name",
+            onMain(
+                () -> {
+                  TvAccessibility access = TvAccessibility.current;
+                  return access == null ? "" : access.currentAppPackage();
+                }));
+        if (args.optString("name").isEmpty())
+          return "Не удалось определить текущее приложение для поиска";
+      }
+    }
     if (name.equals("mute"))
       return execute("volume", new JSONObject().put("muted", args.getBoolean("enabled")));
     if (name.equals("media_control")) {
@@ -25,14 +50,27 @@ final class TvTools {
             .put("status", "rejected")
             .put("requires_visual", false)
             .toString();
-      return MediaSessionControl.execute(
-              (command, timeout) -> AdbRemote.shell(context, command, timeout),
-              ActionWait.MONOTONIC,
-              args.optString("action"),
-              target)
-          .toString();
+      try {
+        return MediaSessionControl.execute(
+                (command, timeout) -> AdbRemote.shell(context, command, timeout, token),
+                ActionWait.MONOTONIC,
+                args.optString("action"),
+                target,
+                token)
+            .toString();
+      } catch (AdbRemote.DispatchException uncertain) {
+        return ActionObservation.result(
+                "Команда мультимедиа могла быть отправлена; результат не подтверждён",
+                new JSONObject(),
+                "")
+            .put("requires_visual", false)
+            .put("dispatch_status", "uncertain")
+            .toString();
+      }
     }
-    return new TvActionObserver(context).execute(name, args, () -> executeRaw(name, args));
+    final JSONObject pinnedArgs = args;
+    return new TvActionObserver(context, token)
+        .execute(name, pinnedArgs, () -> executeRaw(name, pinnedArgs));
   }
 
   private String executeRaw(String name, JSONObject args) throws Exception {
@@ -41,25 +79,31 @@ final class TvTools {
       try {
         return RemoteSequence.execute(
             args.optJSONArray("steps"),
-            direction -> AdbRemote.key(context, direction),
+            direction -> AdbRemote.key(context, direction, token),
             ActionWait.MONOTONIC);
       } catch (IllegalArgumentException invalid) {
         return invalid.getMessage();
       }
     }
     if (name.equals("type_text"))
-      return DirectInput.enter(context, args.getString("text"), args.optBoolean("submit", false));
+      return DirectInput.enter(
+          context, args.getString("text"), args.optBoolean("submit", false), null, false, token);
     if (name.equals("navigate")) {
       int count = args.optInt("count", 1), completed = 0;
       if (count < 1 || count > 20) return "Нужно указать от 1 до 20 нажатий";
       try {
         for (int i = 0; i < count; i++) {
-          if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
-          AdbRemote.key(context, args.getString("direction"));
+          token.check();
+          AdbRemote.key(context, args.getString("direction"), token);
           completed++;
           if (i + 1 < count) Thread.sleep(100);
         }
         return "Выполнено нажатий: " + completed + ", кнопка: " + args.getString("direction");
+      } catch (java.util.concurrent.CancellationException e) {
+        throw e;
+      } catch (AdbRemote.DispatchException e) {
+        return "Команда пульта могла быть отправлена; результат не подтверждён. Повтор не"
+            + " выполнялся";
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         return "Остановлено. Выполнено нажатий: " + completed;
@@ -79,13 +123,11 @@ final class TvTools {
     }
     if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper())
       return executeOnMain(name, args);
-    java.util.concurrent.FutureTask<String> task =
-        new java.util.concurrent.FutureTask<>(() -> executeOnMain(name, args));
-    new android.os.Handler(android.os.Looper.getMainLooper()).post(task);
-    return task.get(15, java.util.concurrent.TimeUnit.SECONDS);
+    return onMain(() -> executeOnMain(name, args), 15000);
   }
 
   private String executeOnMain(String name, JSONObject args) throws Exception {
+    token.check();
     switch (name) {
       case "list_apps":
         {
@@ -118,12 +160,14 @@ final class TvTools {
           Intent launch = pm.getLeanbackLaunchIntentForPackage(found);
           if (launch == null) launch = pm.getLaunchIntentForPackage(found);
           if (launch == null) return "У приложения нет доступного экрана запуска";
+          token.check();
           context.startActivity(launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
           return "Команда открытия приложения отправлена";
         }
       case "volume":
         {
           AudioManager audio = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+          token.check();
           if (args.has("muted")) {
             audio.adjustStreamVolume(
                 AudioManager.STREAM_MUSIC,
@@ -131,10 +175,9 @@ final class TvTools {
                 0);
           } else if (args.has("percent")) {
             int percent = Math.min(100, Math.max(0, args.getInt("percent")));
-            audio.setStreamVolume(
-                AudioManager.STREAM_MUSIC,
-                Math.round(audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC) * percent / 100f),
-                0);
+            int max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+            token.check();
+            audio.setStreamVolume(AudioManager.STREAM_MUSIC, Math.round(max * percent / 100f), 0);
           } else
             audio.adjustStreamVolume(
                 AudioManager.STREAM_MUSIC,
@@ -148,17 +191,17 @@ final class TvTools {
               + audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
         }
       case "tap":
-        return access().tap(args.getInt("x"), args.getInt("y"))
+        return access().tap(args.getInt("x"), args.getInt("y"), token)
             ? "Нажатие отправлено. Проверь новый снимок экрана."
             : "Нажатие не отправлено";
       case "read_screen":
         return access().screen();
       case "navigate":
-        return access().navigate(args.getString("direction"))
+        return access().navigate(args.getString("direction"), token)
             ? "Действие выполнено"
             : "Не удалось выполнить навигацию";
       case "click":
-        return access().click(args.getString("text"))
+        return access().click(args.getString("text"), token)
             ? "Элемент нажат"
             : "Доступный элемент не найден";
       default:
@@ -200,6 +243,7 @@ final class TvTools {
     if (onMain(
         () -> {
           if (standard.resolveActivity(pm) == null) return false;
+          token.check();
           context.startActivity(standard);
           return true;
         })) return submitted;
@@ -209,15 +253,15 @@ final class TvTools {
       boolean opened = false;
       long deadline = android.os.SystemClock.elapsedRealtime() + 2000;
       while (android.os.SystemClock.elapsedRealtime() < deadline) {
-        if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
+        token.check();
         final boolean searchOpened = opened;
         int state =
             onMain(
                 () -> {
                   TvAccessibility access = TvAccessibility.current;
-                  return access == null ? 0 : access.prepareSearch(target, searchOpened);
+                  return access == null ? 0 : access.prepareSearch(target, searchOpened, token);
                 });
-        if (state == 2) return DirectInput.enter(context, query, true, target, opened);
+        if (state == 2) return DirectInput.enter(context, query, true, target, opened, token);
         if (state == 1) opened = true;
         Thread.sleep(100);
       }
@@ -249,6 +293,7 @@ final class TvTools {
       return onMain(
           () -> {
             if (fallback.resolveActivity(pm) == null) return false;
+            token.check();
             context.startActivity(fallback);
             return true;
           });
@@ -263,8 +308,10 @@ final class TvTools {
           if (access == null || !target.equals(access.currentAppPackage())) {
             Intent launch = pm.getLeanbackLaunchIntentForPackage(target);
             if (launch == null) launch = pm.getLaunchIntentForPackage(target);
-            if (launch != null)
+            if (launch != null) {
+              token.check();
               context.startActivity(launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            }
           }
           return null;
         });
@@ -276,15 +323,15 @@ final class TvTools {
   }
 
   private <T> T onMain(java.util.concurrent.Callable<T> action) throws Exception {
-    if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
-    java.util.concurrent.FutureTask<T> task = new java.util.concurrent.FutureTask<>(action);
-    new android.os.Handler(android.os.Looper.getMainLooper()).post(task);
-    try {
-      return task.get(2, java.util.concurrent.TimeUnit.SECONDS);
-    } catch (Exception e) {
-      task.cancel(false);
-      throw e;
-    }
+    return onMain(action, 2000);
+  }
+
+  private <T> T onMain(java.util.concurrent.Callable<T> action, long timeoutMs) throws Exception {
+    return ActionDispatch.onQueue(
+        task -> new android.os.Handler(android.os.Looper.getMainLooper()).post(task),
+        action,
+        token,
+        timeoutMs);
   }
 
   static String resolveApp(PackageManager pm, String query) {

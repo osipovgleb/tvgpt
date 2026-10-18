@@ -6,10 +6,18 @@ public class AgentLoopTest {
   public static void main(String[] args) throws Exception {
     Http.reset(0);
     final int[] ended = {0};
-    String stopped =
-        new Agent(null, SessionWorkspace.open(null), () -> ended[0]++).run("Заверши голосовой чат");
-    if (ended[0] != 1 || Http.requests != 0)
-      throw new AssertionError("Closing must be local, with no model request");
+    Http.scripted =
+        new JSONArray[] {
+          new JSONArray()
+              .put(
+                  new JSONObject()
+                      .put("type", "function_call")
+                      .put("name", "end_conversation")
+                      .put("call_id", "close-1")
+                      .put("arguments", "{}"))
+        };
+    new Agent(null, SessionWorkspace.open(null), () -> ended[0]++).run("Au revoir, à demain");
+    if (ended[0] != 1 || Http.requests != 1) throw new AssertionError("Real end tool not invoked");
     Http.reset(8);
     String result = new Agent(null).run("Выполни восемь последовательных действий");
     if (TvTools.actions != 8 || !result.equals("Готово"))

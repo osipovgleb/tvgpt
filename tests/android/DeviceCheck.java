@@ -39,7 +39,7 @@ public class DeviceCheck extends Instrumentation {
     return null;
   }
 
-  private void checkPartialClose(Bundle result) throws Exception {
+  private void checkModelClose(Bundle result) throws Exception {
     long deadline = android.os.SystemClock.elapsedRealtime() + 20000;
     while ((AssistantService.current == null || TvAccessibility.current == null)
         && android.os.SystemClock.elapsedRealtime() < deadline) android.os.SystemClock.sleep(100);
@@ -51,6 +51,7 @@ public class DeviceCheck extends Instrumentation {
           b.putString("source", "launch");
           AssistantService.current.showSession(b, 0);
         });
+    boolean ready = false;
     deadline = android.os.SystemClock.elapsedRealtime() + 30000;
     while (android.os.SystemClock.elapsedRealtime() < deadline) {
       String[] state = {""};
@@ -58,22 +59,21 @@ public class DeviceCheck extends Instrumentation {
           () -> {
             if (VoicePanel.active != null) state[0] = VoicePanel.active.diagnostics();
           });
-      if (state[0].equals("Слушаю")) break;
+      if (state[0].equals("Слушаю")) {
+        ready = true;
+        break;
+      }
       android.os.SystemClock.sleep(100);
     }
-    if (VoicePanel.active == null) throw new Exception("No active voice panel");
+    if (!ready || VoicePanel.active == null) throw new Exception("Live did not become ready");
     long start = android.os.SystemClock.elapsedRealtime();
-    runOnMainSync(
-        () ->
-            VoicePanel.active.injectTestEvent(
-                "{\"type\":\"input_transcript.added\",\"item\":{\"text\":\"Заверши голосовой"
-                    + " чат\"}}"));
-    deadline = start + 2000;
+    runOnMainSync(() -> VoicePanel.active.injectTestText("На сегодня заканчиваем наше общение"));
+    deadline = start + 20000;
     while (VoicePanel.active != null && android.os.SystemClock.elapsedRealtime() < deadline)
       android.os.SystemClock.sleep(10);
     if (VoicePanel.active != null)
-      throw new Exception("Partial close did not finish within2 seconds");
-    result.putLong("partial_to_close_ms", android.os.SystemClock.elapsedRealtime() - start);
+      throw new Exception("Model close did not finish within20 seconds");
+    result.putLong("model_to_close_ms", android.os.SystemClock.elapsedRealtime() - start);
   }
 
   private boolean ducked(int uid) throws Exception {
@@ -423,6 +423,7 @@ public class DeviceCheck extends Instrumentation {
         }
       } else if (mode.equals("features")) {
         FeatureChecks.database(getTargetContext(), result);
+
       } else if (mode.equals("bundled-voices")) {
         BundledVoiceChecks.run(this, result);
       } else if (mode.equals("preview")) {
@@ -515,8 +516,62 @@ public class DeviceCheck extends Instrumentation {
         } finally {
           manager.setMode(original);
         }
-      } else if (mode.equals("partial-close-ui")) {
-        checkPartialClose(result);
+      } else if (mode.equals("harness-agent")) {
+        startActivitySync(
+            new android.content.Intent(getTargetContext(), MainActivity.class)
+                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK));
+        long bindingDeadline = android.os.SystemClock.elapsedRealtime() + 20000;
+        while (TvAccessibility.current == null
+            && android.os.SystemClock.elapsedRealtime() < bindingDeadline)
+          android.os.SystemClock.sleep(100);
+        if (TvAccessibility.current == null)
+          throw new Exception("Instrumentation accessibility did not rebind");
+        SessionStore.State isolated = new SessionStore.State();
+        isolated.id = java.util.UUID.randomUUID().toString();
+        isolated.history = new org.json.JSONArray();
+        isolated.transcript = new org.json.JSONArray();
+        TaskHarness harness = new TaskHarness();
+        TaskHarness.Task task =
+            harness.admit("device-task", "device-user", text, new org.json.JSONArray());
+        Agent worker =
+            new Agent(
+                getTargetContext(),
+                isolated,
+                () -> result.putBoolean("end_tool", true),
+                harness,
+                task);
+        String answer = worker.run(text);
+        result.putString("outcome", worker.outcome(answer));
+        result.putInt("history_items", isolated.history.length());
+        org.json.JSONArray trace = new org.json.JSONArray();
+        for (int i = 0; i < isolated.history.length(); i++) {
+          JSONObject item = isolated.history.getJSONObject(i);
+          if (item.optString("type").equals("function_call"))
+            trace.put(
+                new JSONObject()
+                    .put("name", item.optString("name"))
+                    .put("id", item.optString("call_id"))
+                    .put("args", item.optString("arguments")));
+          else if (item.optString("type").equals("function_call_output")) {
+            String value =
+                item.opt("output") instanceof org.json.JSONArray
+                    ? "[visual content]"
+                    : item.optString("output");
+            trace.put(
+                new JSONObject()
+                    .put("receipt", item.optString("call_id"))
+                    .put("result", value.substring(0, Math.min(1600, value.length()))));
+          }
+        }
+        result.putString("tool_trace", trace.toString());
+      } else if (mode.equals("model-close-ui")) {
+        int cycles = Math.max(1, Math.min(3, Integer.parseInt(args.getString("cycles", "1"))));
+        for (int cycle = 0; cycle < cycles; cycle++) {
+          Bundle sample = new Bundle();
+          checkModelClose(sample);
+          result.putLong("close_ms_" + cycle, sample.getLong("model_to_close_ms"));
+        }
+        result.putInt("cycles", cycles);
       } else if (mode.equals("close-ui")) {
         Activity activity =
             startActivitySync(
@@ -548,20 +603,28 @@ public class DeviceCheck extends Instrumentation {
         if (VoicePanel.active == null) throw new Exception("No Live panel");
         String goodbyeEvent =
             new JSONObject()
-                .put("type", "turn.done")
+                .put("type", "delegation.created")
                 .put(
-                    "turn",
+                    "item",
                     new JSONObject()
-                        .put("role", "user")
-                        .put("transcript", args.getString("goodbye", "Заверши голосовой чат")))
+                        .put("id", "close-ui-probe")
+                        .put("type", "delegation")
+                        .put("target", "client")
+                        .put(
+                            "content",
+                            new org.json.JSONArray()
+                                .put(
+                                    new JSONObject()
+                                        .put("type", "input_text")
+                                        .put("text", "На сегодня заканчиваем наше общение"))))
                 .toString();
         long start = android.os.SystemClock.elapsedRealtime();
         runOnMainSync(() -> VoicePanel.active.injectTestEvent(goodbyeEvent));
-        deadline = start + 2000;
+        deadline = start + 20000;
         while (VoicePanel.active != null && android.os.SystemClock.elapsedRealtime() < deadline)
           android.os.SystemClock.sleep(10);
         if (VoicePanel.active != null) throw new Exception("Closing did not release panel");
-        result.putLong("local_close_ms", android.os.SystemClock.elapsedRealtime() - start);
+        result.putLong("delegation_close_ms", android.os.SystemClock.elapsedRealtime() - start);
         runOnMainSync(
             () -> {
               android.view.View label =
@@ -591,6 +654,109 @@ public class DeviceCheck extends Instrumentation {
             });
         if (!activity.isFinishing()) throw new Exception("Back did not finish settings");
         result.putBoolean("back_exits", true);
+      } else if (mode.equals("digest-inspect")) {
+        local.tvgpt.assistant.data.DigestRepository repo =
+            new local.tvgpt.assistant.data.DigestRepository(getTargetContext());
+        String id = args.getString("digest_id");
+        org.json.JSONArray
+            articles = local.tvgpt.assistant.digests.DigestSlides.latest(repo.cards(id)),
+            checks = new org.json.JSONArray();
+        for (int i = 0; i < articles.length(); i++) {
+          JSONObject a = articles.getJSONObject(i);
+          java.io.File photo = new java.io.File(a.optString("image_path"));
+          android.graphics.BitmapFactory.Options bounds =
+              new android.graphics.BitmapFactory.Options();
+          bounds.inJustDecodeBounds = true;
+          if (photo.isFile())
+            android.graphics.BitmapFactory.decodeFile(photo.getAbsolutePath(), bounds);
+          checks.put(
+              new JSONObject()
+                  .put("title", a.optString("title"))
+                  .put("url", a.optString("url"))
+                  .put("image_kind", a.optString("image_kind"))
+                  .put("image_bytes", photo.isFile() ? photo.length() : 0)
+                  .put("width", bounds.outWidth)
+                  .put("height", bounds.outHeight));
+        }
+        result.putString(
+            "result",
+            new JSONObject()
+                .put("job", repo.latestJob(id))
+                .put("articles", checks)
+                .put(
+                    "imagegen",
+                    getTargetContext()
+                        .getSharedPreferences("digests", 0)
+                        .getString("imagegen", "unconfirmed"))
+                .toString());
+      } else if (mode.equals("digest-imagegen-request")) {
+        android.content.Context c = getTargetContext();
+        String id = args.getString("digest_id");
+        JSONObject article =
+            local.tvgpt.assistant.digests.DigestSlides.latest(
+                    new local.tvgpt.assistant.data.DigestRepository(c).cards(id))
+                .getJSONObject(0);
+        String skill = AssistantSkills.app(c, "imagegen");
+        if (!skill.contains("name: imagegen")) throw new AssertionError("imagegen skill missing");
+        JSONObject job =
+            new local.tvgpt.assistant.digests.DigestCommands(c)
+                .execute(
+                    "digest_cover_generate",
+                    new JSONObject()
+                        .put("digest_id", id)
+                        .put("article_id", article.getString("id"))
+                        .put("operation_id", java.util.UUID.randomUUID().toString())
+                        .put(
+                            "prompt",
+                            "Горизонтальная редакционная иллюстрация для заставки ТВ, без текста"));
+        Bundle progress = new Bundle();
+        progress.putString("job_id", job.getString("job_id"));
+        sendStatus(0, progress);
+        long deadline = android.os.SystemClock.elapsedRealtime() + 220000;
+        local.tvgpt.assistant.data.DigestRepository repo =
+            new local.tvgpt.assistant.data.DigestRepository(c);
+        JSONObject observed;
+        do {
+          observed = repo.job(job.getString("job_id"));
+          String state = observed.optString("state");
+          if (state.equals("ready")
+              || state.equals("failed")
+              || state.equals("unconfirmed")
+              || state.equals("cancelled")) break;
+          android.os.SystemClock.sleep(250);
+        } while (android.os.SystemClock.elapsedRealtime() < deadline);
+        JSONObject cover = repo.persistedArticles(job.getString("job_id")).getJSONObject(0);
+        android.graphics.BitmapFactory.Options dimensions =
+            new android.graphics.BitmapFactory.Options();
+        dimensions.inJustDecodeBounds = true;
+        java.io.File image = new java.io.File(cover.optString("image_path"));
+        if (image.isFile())
+          android.graphics.BitmapFactory.decodeFile(image.getAbsolutePath(), dimensions);
+        result.putString(
+            "result",
+            job.put("digest_model", ModelSettings.digests(c))
+                .put("skill_loaded", true)
+                .put("state", observed.optString("state"))
+                .put("reason", observed.optString("reason"))
+                .put("cover_kind", cover.optString("image_kind"))
+                .put("width", dimensions.outWidth)
+                .put("height", dimensions.outHeight)
+                .put("image_bytes", image.isFile() ? image.length() : 0)
+                .put(
+                    "imagegen_status",
+                    c.getSharedPreferences("digests", 0).getString("imagegen", "unconfirmed"))
+                .put(
+                    "imagegen_reason",
+                    c.getSharedPreferences("digests", 0).getString("imagegen_reason", ""))
+                .toString());
+      } else if (mode.equals("digest-command")) {
+        result.putString(
+            "result",
+            new local.tvgpt.assistant.digests.DigestCommands(getTargetContext())
+                .execute(args.getString("name"), new JSONObject(args.getString("arguments", "{}")))
+                .toString());
+      } else if (mode.equals("agent-news")) {
+        result.putString("result", new Agent(getTargetContext()).run(text));
       } else if (mode.equals("agent") || mode.equals("controls")) {
         startActivitySync(
             new android.content.Intent(getTargetContext(), MainActivity.class)
@@ -630,7 +796,10 @@ public class DeviceCheck extends Instrumentation {
             new TvTools(getTargetContext())
                 .execute(
                     args.getString("name"), new JSONObject(args.getString("arguments", "{}"))));
-      } else if (mode.equals("live") || mode.equals("home-live")) {
+      } else if (mode.equals("live")
+          || mode.equals("home-live")
+          || mode.equals("physical-home-live")
+          || mode.equals("model-intent-close")) {
         long readyDeadline = android.os.SystemClock.elapsedRealtime() + 20000;
         while ((AssistantService.current == null || TvAccessibility.current == null)
             && android.os.SystemClock.elapsedRealtime() < readyDeadline)
@@ -649,21 +818,30 @@ public class DeviceCheck extends Instrumentation {
               invocation.putString("source", "launch");
               AssistantService.current.showSession(invocation, 0);
             });
-        long deadline = android.os.SystemClock.elapsedRealtime() + 45000;
+        long startedAt = android.os.SystemClock.elapsedRealtime();
+        boolean connected = false;
+        long deadline = startedAt + 45000;
         while (android.os.SystemClock.elapsedRealtime() < deadline) {
           String[] status = {""};
           runOnMainSync(
               () -> {
                 if (VoicePanel.active != null) status[0] = VoicePanel.active.diagnostics();
               });
-          if (status[0].equals("Голосовой канал подключён") || status[0].equals("Слушаю")) break;
+          if (status[0].equals("Голосовой канал подключён") || status[0].equals("Слушаю")) {
+            connected = true;
+            break;
+          }
           android.os.SystemClock.sleep(250);
         }
-        if (VoicePanel.active == null) throw new Exception("No active Live panel");
-        if (mode.equals("home-live")) {
+        if (VoicePanel.active == null || !connected) throw new Exception("Live did not connect");
+        result.putLong("startup_ms", android.os.SystemClock.elapsedRealtime() - startedAt);
+        if (mode.equals("home-live") || mode.equals("physical-home-live")) {
           VoicePanel original = VoicePanel.active;
-          new TvTools(getTargetContext())
-              .execute("navigate", new JSONObject().put("direction", "home"));
+          if (mode.equals("physical-home-live")) {
+            AdbRemote.shell(getTargetContext(), "input keyevent 3", 2000);
+          } else
+            new TvTools(getTargetContext())
+                .execute("navigate", new JSONObject().put("direction", "home"));
           android.os.SystemClock.sleep(1500);
           if (VoicePanel.active != original)
             throw new Exception("HOME closed the voice conversation");
@@ -681,7 +859,21 @@ public class DeviceCheck extends Instrumentation {
           result.putLong("native_close_ms", android.os.SystemClock.elapsedRealtime() - closing);
         } else {
           runOnMainSync(() -> VoicePanel.active.injectTestText(text));
-          android.os.SystemClock.sleep(20000);
+          if (mode.equals("model-intent-close")) {
+            long requested = android.os.SystemClock.elapsedRealtime();
+            if (!ActionWait.until(
+                () -> {
+                  boolean[] ended = {false};
+                  runOnMainSync(() -> ended[0] = VoicePanel.active == null);
+                  return ended[0];
+                },
+                15000,
+                ActionWait.MONOTONIC))
+              throw new Exception("Live did not delegate end of conversation");
+            result.putLong(
+                "model_decision_and_close_ms",
+                android.os.SystemClock.elapsedRealtime() - requested);
+          } else android.os.SystemClock.sleep(20000);
         }
         runOnMainSync(
             () ->
@@ -699,6 +891,14 @@ public class DeviceCheck extends Instrumentation {
       finish(Activity.RESULT_OK, result);
     } catch (Exception e) {
       result.putString("error", e.getClass().getSimpleName() + ": " + e.getMessage());
+      Throwable cause = e.getCause();
+      int depth = 0;
+      while (cause != null && depth < 3) {
+        result.putString(
+            "cause_" + depth, cause.getClass().getSimpleName() + ": " + cause.getMessage());
+        cause = cause.getCause();
+        depth++;
+      }
       finish(Activity.RESULT_CANCELED, result);
     }
   }

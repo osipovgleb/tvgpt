@@ -23,6 +23,14 @@ public class TvAccessibility extends AccessibilityService {
   }
 
   @Override
+  public boolean onUnbind(android.content.Intent intent) {
+    // A disconnected service may outlive its accessibility window token.
+    if (current == this) current = null;
+    hideVoiceOverlay();
+    return super.onUnbind(intent);
+  }
+
+  @Override
   public void onDestroy() {
     hideVoiceOverlay();
     ReminderPopup.dismiss(this);
@@ -152,21 +160,27 @@ public class TvAccessibility extends AccessibilityService {
     }
   }
 
-  // Null means no supported focused editor; it is safe to try the native IME next.
+  // Null requires the IME fallback to recheck the originally captured editor.
   String setFocusedText(String text, boolean submit) {
+    return setFocusedText(text, submit, null, CancellationToken.NONE);
+  }
+
+  String setFocusedText(
+      String text, boolean submit, AccessibilityNodeInfo expected, CancellationToken token) {
+    token.check();
     AccessibilityNodeInfo root = appRoot();
     if (root == null) return null;
     AccessibilityNodeInfo focused = null;
     try {
       focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);
-      if (focused == null
-          || !focused.isEditable()
-          || !focused.isVisibleToUser()
-          || !focused.isEnabled()
-          || !focused.isFocused()) return null;
+      if (!usableEditor(focused)
+          || !Objects.equals(root.getPackageName(), focused.getPackageName())
+          || (expected != null && !focused.equals(expected))) return null;
+      token.check();
       android.os.Bundle args = new android.os.Bundle();
       args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text);
       if (!focused.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)) return null;
+      token.check();
       boolean submitted =
           submit
               && focused.performAction(
@@ -212,7 +226,27 @@ public class TvAccessibility extends AccessibilityService {
       if (!targetPackage.contentEquals(root.getPackageName() == null ? "" : root.getPackageName()))
         return null;
       focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);
-      if (!recognizedSearchEditor(focused, searchOpened)) return null;
+      if (!recognizedSearchEditor(focused, searchOpened)
+          || !Objects.equals(root.getPackageName(), focused.getPackageName())) return null;
+      AccessibilityNodeInfo snapshot = focused;
+      focused = null;
+      return snapshot;
+    } finally {
+      if (focused != null) focused.recycle();
+      root.recycle();
+    }
+  }
+
+  AccessibilityNodeInfo captureFocusedEditor(String targetPackage) {
+    AccessibilityNodeInfo root = appRoot();
+    if (root == null) return null;
+    AccessibilityNodeInfo focused = null;
+    try {
+      if (!targetPackage.contentEquals(root.getPackageName() == null ? "" : root.getPackageName()))
+        return null;
+      focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);
+      if (!usableEditor(focused)
+          || !Objects.equals(root.getPackageName(), focused.getPackageName())) return null;
       AccessibilityNodeInfo snapshot = focused;
       focused = null;
       return snapshot;
@@ -231,7 +265,9 @@ public class TvAccessibility extends AccessibilityService {
       if (!targetPackage.contentEquals(root.getPackageName() == null ? "" : root.getPackageName()))
         return false;
       focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);
-      return usableEditor(focused) && focused.equals(expected);
+      return usableEditor(focused)
+          && Objects.equals(root.getPackageName(), focused.getPackageName())
+          && focused.equals(expected);
     } finally {
       if (focused != null) focused.recycle();
       root.recycle();
@@ -240,6 +276,11 @@ public class TvAccessibility extends AccessibilityService {
 
   // 0: absent; 1: search button clicked; 2: ready editor; 3: known editor focus requested.
   int prepareSearch(String targetPackage, boolean searchOpened) {
+    return prepareSearch(targetPackage, searchOpened, CancellationToken.NONE);
+  }
+
+  int prepareSearch(String targetPackage, boolean searchOpened, CancellationToken token) {
+    token.check();
     AccessibilityNodeInfo root = appRoot();
     if (root == null) return 0;
     try {
@@ -255,7 +296,7 @@ public class TvAccessibility extends AccessibilityService {
       int[] remaining = {400};
       AccessibilityNodeInfo before = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);
       try {
-        int state = openSearchNode(root, 0, remaining);
+        int state = openSearchNode(root, 0, remaining, token);
         if (state == 1) {
           resetSearchProbe();
           previousSearchFocus = before;
@@ -287,21 +328,24 @@ public class TvAccessibility extends AccessibilityService {
         node.getContentDescription());
   }
 
-  private int openSearchNode(AccessibilityNodeInfo node, int depth, int[] remaining) {
+  private int openSearchNode(
+      AccessibilityNodeInfo node, int depth, int[] remaining, CancellationToken token) {
     if (node == null || depth > 16 || --remaining[0] < 0) return 0;
     if (node.isVisibleToUser() && node.isEnabled() && !node.isPassword() && searchNode(node)) {
       if (node.isEditable()) {
+        token.check();
         boolean focused = node.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
+        token.check();
         boolean clicked = node.performAction(AccessibilityNodeInfo.ACTION_CLICK);
         if (focused || clicked) return 3;
-      } else if (clickSearchButton(node)) {
+      } else if (clickSearchButton(node, token)) {
         return 1;
       }
     }
     for (int i = 0; i < node.getChildCount(); i++) {
       AccessibilityNodeInfo child = node.getChild(i);
       try {
-        int state = openSearchNode(child, depth + 1, remaining);
+        int state = openSearchNode(child, depth + 1, remaining, token);
         if (state != 0) return state;
       } finally {
         if (child != null) child.recycle();
@@ -310,7 +354,8 @@ public class TvAccessibility extends AccessibilityService {
     return 0;
   }
 
-  private boolean clickSearchButton(AccessibilityNodeInfo node) {
+  private boolean clickSearchButton(AccessibilityNodeInfo node, CancellationToken token) {
+    token.check();
     if (node.isClickable() && node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true;
     CharSequence targetPackage = node.getPackageName();
     if (targetPackage == null) return false;
@@ -319,19 +364,25 @@ public class TvAccessibility extends AccessibilityService {
       for (int i = 0; parent != null && i < 3; i++) {
         if (!targetPackage.equals(parent.getPackageName())) return false;
         AccessibilityNodeInfo next = parent.getParent();
-        // A matching child label must never turn into a click on the whole app root.
-        if (next == null) return false;
-        boolean clicked =
-            parent.isVisibleToUser()
-                && parent.isEnabled()
-                && !parent.isEditable()
-                && !parent.isPassword()
-                && parent.isClickable()
-                && !"android:id/content".equals(parent.getViewIdResourceName())
-                && parent.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-        parent.recycle();
-        parent = next;
-        if (clicked) return true;
+        try {
+          // A matching child label must never turn into a click on the whole app root.
+          if (next == null) return false;
+          token.check();
+          boolean clicked =
+              parent.isVisibleToUser()
+                  && parent.isEnabled()
+                  && !parent.isEditable()
+                  && !parent.isPassword()
+                  && parent.isClickable()
+                  && !"android:id/content".equals(parent.getViewIdResourceName())
+                  && parent.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+          parent.recycle();
+          parent = next;
+          next = null;
+          if (clicked) return true;
+        } finally {
+          if (next != null) next.recycle();
+        }
       }
       return false;
     } finally {
@@ -348,10 +399,19 @@ public class TvAccessibility extends AccessibilityService {
   }
 
   boolean click(String label) {
-    return AccessibleClick.perform(appRoot(), label);
+    return click(label, CancellationToken.NONE);
+  }
+
+  boolean click(String label, CancellationToken token) {
+    return AccessibleClick.perform(appRoot(), label, token);
   }
 
   boolean tap(int x, int y) {
+    return tap(x, y, CancellationToken.NONE);
+  }
+
+  boolean tap(int x, int y, CancellationToken token) {
+    token.check();
     if (ScreenCapture.imageWidth == 0
         || x < 0
         || y < 0
@@ -361,6 +421,7 @@ public class TvAccessibility extends AccessibilityService {
     path.moveTo(
         x * ScreenCapture.displayWidth / (float) ScreenCapture.imageWidth,
         y * ScreenCapture.displayHeight / (float) ScreenCapture.imageHeight);
+    token.check();
     return dispatchGesture(
         new android.accessibilityservice.GestureDescription.Builder()
             .addStroke(
@@ -371,9 +432,15 @@ public class TvAccessibility extends AccessibilityService {
   }
 
   boolean navigate(String direction) {
+    return navigate(direction, CancellationToken.NONE);
+  }
+
+  boolean navigate(String direction, CancellationToken token) {
+    token.check();
     if (direction.equals("home") || direction.equals("back")) {
       if (direction.equals("home")) detachVoiceSessionForHome();
       releaseAppFocus();
+      token.check();
       boolean done =
           performGlobalAction(direction.equals("home") ? GLOBAL_ACTION_HOME : GLOBAL_ACTION_BACK);
       restoreOverlayFocus();
@@ -381,18 +448,27 @@ public class TvAccessibility extends AccessibilityService {
     }
     AccessibilityNodeInfo root = appRoot();
     if (root == null) return false;
-    AccessibilityNodeInfo focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);
-    if (focused == null) focused = root.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY);
-    if (focused == null) return false;
-    if (direction.equals("select"))
-      return focused.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-    int d =
-        direction.equals("left")
-            ? View.FOCUS_LEFT
-            : direction.equals("right")
-                ? View.FOCUS_RIGHT
-                : direction.equals("up") ? View.FOCUS_UP : View.FOCUS_DOWN;
-    AccessibilityNodeInfo next = focused.focusSearch(d);
-    return next != null && next.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
+    AccessibilityNodeInfo focused = null, next = null;
+    try {
+      focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);
+      if (focused == null) focused = root.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY);
+      if (focused == null) return false;
+      token.check();
+      if (direction.equals("select"))
+        return focused.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+      int d =
+          direction.equals("left")
+              ? View.FOCUS_LEFT
+              : direction.equals("right")
+                  ? View.FOCUS_RIGHT
+                  : direction.equals("up") ? View.FOCUS_UP : View.FOCUS_DOWN;
+      next = focused.focusSearch(d);
+      token.check();
+      return next != null && next.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
+    } finally {
+      if (next != null) next.recycle();
+      if (focused != null) focused.recycle();
+      root.recycle();
+    }
   }
 }

@@ -13,7 +13,8 @@ final class AssistantSkills {
   static synchronized String app(Context context, String name) throws Exception {
     String id = AppSkillIndex.id(name);
     if (id.isEmpty())
-      return "Встроенный навык пока отсутствует. Доступен youtube; продолжай по общему app-search.";
+      return "Встроенный навык пока отсутствует. Доступны youtube и imagegen; для поиска продолжай"
+          + " по общему app-search.";
     String content = appCache.get(id);
     if (content == null) {
       content = AppSkillIndex.read(context.getAssets().open(AppSkillIndex.asset(id)));

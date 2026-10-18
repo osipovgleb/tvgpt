@@ -21,22 +21,10 @@ public final class AlarmScheduler {
 
   public static void reconcile(Context c) {
     ReminderRepository repo = new ReminderRepository(c);
-    JSONArray items = repo.list();
     AlarmManager alarms = c.getSystemService(AlarmManager.class);
     long now = System.currentTimeMillis();
-    long next = Long.MAX_VALUE;
-    for (int i = 0; i < items.length(); i++) {
-      JSONObject item = items.optJSONObject(i);
-      if (item.optInt("enabled") != 1 || !item.optString("status").equals("scheduled")) continue;
-      long due = item.optLong("due");
-      if (item.optString("kind").equals("TIMER") && item.optString("boot").equals(boot(c))) {
-        due =
-            SchedulePolicy.timerWallDue(
-                now, SystemClock.elapsedRealtime(), item.optLong("elapsed_due"), true, due);
-        repo.timerDue(item.optLong("id"), due);
-      }
-      next = Math.min(next, due);
-    }
+    repo.rebaseTimers(now, SystemClock.elapsedRealtime(), boot(c));
+    long next = repo.nextDue(ReminderDispatcher.interactive(c));
     PendingIntent intent =
         PendingIntent.getBroadcast(
             c,

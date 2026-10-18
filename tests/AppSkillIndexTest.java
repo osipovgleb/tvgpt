@@ -14,6 +14,8 @@ public final class AppSkillIndexTest {
       if (!content.startsWith("---\nname: youtube\n") || content.length() < 100)
         throw new AssertionError("Bundled skill unavailable or invalid");
     }
+    if (!AppSkillIndex.asset("imagegen").equals("skills/imagegen/SKILL.md"))
+      throw new AssertionError("imagegen skill not available to the app agent");
     for (String name :
         new String[] {
           null,

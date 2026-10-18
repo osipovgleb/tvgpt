@@ -42,9 +42,17 @@ final class MediaSessionControl {
 
   static JSONObject execute(Remote remote, ActionWait.Time time, String action, String pkg)
       throws Exception {
+    return execute(remote, time, action, pkg, CancellationToken.NONE);
+  }
+
+  static JSONObject execute(
+      Remote remote, ActionWait.Time time, String action, String pkg, CancellationToken token)
+      throws Exception {
+    token.check();
     if (!action.equals("pause") && !action.equals("play"))
       return rejected("Нужна команда pause или play");
     List<Session> sessions = parse(remote.shell("dumpsys media_session", 1500));
+    token.check();
     List<Session> candidates = new ArrayList<>();
     for (Session session : sessions)
       if (session.active && (pkg.isEmpty() || pkg.equals(session.pkg))) candidates.add(session);
@@ -66,7 +74,9 @@ final class MediaSessionControl {
     if (target.state == desired) return result(target, true, "Состояние уже установлено");
     String command =
         "printf '%s\\n' " + quote(action) + " 'q' | cmd media_session monitor " + quote(target.tag);
+    token.check();
     String receipt = remote.shell(command, 2000);
+    token.check();
     if (receipt.contains("No session found")
         || receipt.contains("Failed to dispatch")
         || receipt.contains("Error")
@@ -76,8 +86,11 @@ final class MediaSessionControl {
       boolean observed =
           ActionWait.until(
               () -> {
+                token.check();
                 latest[0] = null;
-                for (Session session : parse(remote.shell("dumpsys media_session", 1000))) {
+                String dump = remote.shell("dumpsys media_session", 1000);
+                token.check();
+                for (Session session : parse(dump)) {
                   if (session.same(target)) {
                     latest[0] = session;
                     return session.state == desired;
@@ -88,6 +101,8 @@ final class MediaSessionControl {
               1800,
               time);
       return result(latest[0], observed, "Команда мультимедиа отправлена: " + action);
+    } catch (java.util.concurrent.CancellationException cancelled) {
+      throw cancelled;
     } catch (InterruptedException cancelled) {
       Thread.currentThread().interrupt();
       throw cancelled;

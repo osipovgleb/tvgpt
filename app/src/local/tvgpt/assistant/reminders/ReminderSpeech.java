@@ -12,6 +12,7 @@ final class ReminderSpeech {
   private final Handler main = new Handler(Looper.getMainLooper());
   private TextToSpeech engine;
   private boolean closed;
+  private final java.util.function.Consumer<String> completion;
   private final BroadcastReceiver screenOff =
       new BroadcastReceiver() {
         public void onReceive(Context c, Intent i) {
@@ -19,34 +20,49 @@ final class ReminderSpeech {
         }
       };
 
-  private ReminderSpeech(Context c) {
+  private ReminderSpeech(Context c, java.util.function.Consumer<String> completion) {
     context = c.getApplicationContext();
+    this.completion = completion;
   }
 
-  static void speak(Context c, String text) {
-    new Handler(Looper.getMainLooper()).post(() -> new ReminderSpeech(c).start(text));
+  static void speak(Context c, String text, java.util.function.Consumer<String> completion) {
+    new Handler(Looper.getMainLooper()).post(() -> new ReminderSpeech(c, completion).start(text));
   }
 
   private void start(String text) {
-    if (!ReminderDispatcher.interactive(context)) return;
-    context.registerReceiver(screenOff, new IntentFilter(Intent.ACTION_SCREEN_OFF));
+    if (!ReminderDispatcher.interactive(context)) {
+      finish("failed");
+      return;
+    }
     main.postDelayed(this::close, 20000);
     try {
-      engine = new TextToSpeech(context, result -> main.post(() -> ready(result, text)));
+      context.registerReceiver(screenOff, new IntentFilter(Intent.ACTION_SCREEN_OFF));
+      engine =
+          new TextToSpeech(
+              context,
+              result ->
+                  main.post(
+                      () -> {
+                        try {
+                          ready(result, text);
+                        } catch (RuntimeException e) {
+                          finish("failed");
+                        }
+                      }));
     } catch (RuntimeException e) {
-      close();
+      finish("failed");
     }
   }
 
   private void ready(int result, String text) {
     if (closed) return;
     if (result != TextToSpeech.SUCCESS || !ReminderDispatcher.interactive(context)) {
-      close();
+      finish("failed");
       return;
     }
     int language = engine.setLanguage(new Locale("ru", "RU"));
     if (language == TextToSpeech.LANG_MISSING_DATA || language == TextToSpeech.LANG_NOT_SUPPORTED) {
-      close();
+      finish("failed");
       return;
     }
     engine.setAudioAttributes(
@@ -59,17 +75,24 @@ final class ReminderSpeech {
           public void onStart(String id) {}
 
           public void onDone(String id) {
-            main.post(ReminderSpeech.this::close);
+            main.post(
+                () ->
+                    finish(ReminderDispatcher.interactive(context) ? "completed" : "unconfirmed"));
           }
 
           public void onError(String id) {
-            main.post(ReminderSpeech.this::close);
+            main.post(() -> finish("failed"));
           }
         });
-    engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, "reminder");
+    if (engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, "reminder") == TextToSpeech.ERROR)
+      finish("failed");
   }
 
   private void close() {
+    finish("unconfirmed");
+  }
+
+  private void finish(String outcome) {
     if (closed) return;
     closed = true;
     main.removeCallbacksAndMessages(null);
@@ -78,9 +101,14 @@ final class ReminderSpeech {
     } catch (IllegalArgumentException ignored) {
     }
     if (engine != null) {
-      engine.stop();
-      engine.shutdown();
+      try {
+        engine.stop();
+        engine.shutdown();
+      } catch (RuntimeException e) {
+        android.util.Log.w("TVGPTReminders", "TTS release unavailable", e);
+      }
       engine = null;
     }
+    completion.accept(outcome);
   }
 }

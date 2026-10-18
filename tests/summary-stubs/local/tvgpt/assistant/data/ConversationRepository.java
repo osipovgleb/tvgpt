@@ -6,6 +6,7 @@ public class ConversationRepository {
   public static long revision = 1;
   public static boolean deleted;
   public static boolean empty;
+  public static JSONArray turns;
   public static int saves;
   public static long captured = -1;
 
@@ -17,6 +18,7 @@ public class ConversationRepository {
 
   public JSONArray tail(String id, int n) throws Exception {
     if (empty) return new JSONArray();
+    if (turns != null) return turns;
     return new JSONArray().put(new JSONObject().put("role", "user").put("text", "topic"));
   }
 

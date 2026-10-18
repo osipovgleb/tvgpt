@@ -13,6 +13,7 @@ final class AccountStore {
   private final Context context;
   private static final Object AUTH_LOCK = new Object();
   private static long revision;
+  private static final RefreshFlight<JSONObject> REFRESH = new RefreshFlight<>();
 
   AccountStore(Context c) {
     context = c.getApplicationContext();
@@ -41,6 +42,7 @@ final class AccountStore {
       writeTokens(tokens);
       revision++;
     }
+    local.tvgpt.assistant.digests.DigestScheduler.reconcile(context);
   }
 
   private void writeTokens(JSONObject tokens) throws Exception {
@@ -80,14 +82,18 @@ final class AccountStore {
   }
 
   void clear() {
+    AssistantService.stopWake();
     if (VoicePanel.active != null) VoicePanel.active.requestEnd();
     synchronized (AUTH_LOCK) {
       revision++;
       ConversationSummarizer.invalidate();
+      local.tvgpt.assistant.digests.DigestWorker.cancel();
+      new local.tvgpt.assistant.data.DigestRepository(context).invalidateAuthorizedJobs();
       VoicePreview.stopActive(null);
       SessionWorkspace.clear(context);
       context.getSharedPreferences("account", 0).edit().clear().commit();
     }
+    AssistantService.refreshWake();
   }
 
   JSONObject fresh() throws Exception {
@@ -100,6 +106,20 @@ final class AccountStore {
     if (tokens == null) throw new Exception("Сначала войдите в аккаунт");
     long expires = claims(tokens.getString("access_token")).optLong("exp", 0);
     if (expires * 1000 > System.currentTimeMillis() + 90000) return tokens;
+    final JSONObject previous = tokens;
+    JSONObject result = REFRESH.run(expectedRevision, () -> refresh(previous, expectedRevision));
+    synchronized (AUTH_LOCK) {
+      if (revision != expectedRevision + 1)
+        throw new Exception("Вход изменился во время обновления токена");
+      return result;
+    }
+  }
+
+  private JSONObject refresh(JSONObject tokens, long expectedRevision) throws Exception {
+    synchronized (AUTH_LOCK) {
+      if (revision != expectedRevision)
+        throw new Exception("Вход изменился во время обновления токена");
+    }
     java.util.Map<String, String> form = new java.util.LinkedHashMap<>();
     form.put("grant_type", "refresh_token");
     form.put("client_id", DeviceLogin.CLIENT);

@@ -1,4 +1,4 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="local.tvgpt.assistant" android:versionCode="1" android:versionName="0.1.0">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="local.tvgpt.assistant" android:versionCode="2" android:versionName="0.1.1-preview">
  <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="31"/>
  <uses-permission android:name="android.permission.INTERNET"/>
  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
@@ -34,5 +34,9 @@
    <intent-filter><action android:name="android.view.InputMethod"/></intent-filter>
    <meta-data android:name="android.view.im" android:resource="@xml/direct_input"/>
   </service>
+  <service android:name=".digests.DigestJobService" android:exported="true" android:permission="android.permission.BIND_JOB_SERVICE"/>
+  <receiver android:name=".digests.DigestReceiver" android:exported="false"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED"/><action android:name="android.intent.action.TIME_SET"/><action android:name="android.intent.action.TIMEZONE_CHANGED"/><action android:name="android.intent.action.MY_PACKAGE_REPLACED"/></intent-filter></receiver>
+  <activity android:name=".DigestPreviewActivity" android:exported="false" android:excludeFromRecents="true"/>
+  <service android:name=".digests.DigestDreamService" android:label="Новости TV GPT" android:exported="true" android:permission="android.permission.BIND_DREAM_SERVICE"><intent-filter><action android:name="android.service.dreams.DreamService"/><category android:name="android.intent.category.DEFAULT"/></intent-filter><meta-data android:name="android.service.dream" android:resource="@xml/digest_dream"/></service>
  </application>
 </manifest>

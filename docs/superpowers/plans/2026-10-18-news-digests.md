@@ -1,6 +1,6 @@
 # News Digests Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Execution method awaits user selection; no implementation is authorized by this document alone.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. User approved inline execution in this chat. Latest user direction: Android performs all work itself; imagegen is optional and cannot gate source-photo digests. Runtime capability detection replaces the separate manual probe/stop in Task 1.
 
 **Goal:** Дать голосовому помощнику управление новостными подборками, источниками, расписаниями и автоматическими иллюстрациями, с просмотром в приложении и системной заставке.
 

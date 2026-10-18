@@ -10,6 +10,13 @@ public final class ModelSettings {
     return read(c, "discussion", "gpt-6.1-sol");
   }
 
+  /** Copy the existing choice once; future discussion changes cannot move digest work. */
+  public static synchronized String digests(Context c) {
+    android.content.SharedPreferences prefs = c.getSharedPreferences("models", 0);
+    if (!prefs.contains("digests")) prefs.edit().putString("digests", discussion(c)).commit();
+    return read(c, "digests", "gpt-6.1-sol");
+  }
+
   public static String summary(Context c) {
     return read(c, "summary", "gpt-6.1-sol");
   }
@@ -68,8 +75,11 @@ public final class ModelSettings {
 
   public static void set(Context c, String kind, String model) {
     if (!ModelOptions.valid(model)
-        || !(kind.equals("discussion") || kind.equals("summary") || kind.equals("live")))
-      throw new IllegalArgumentException("model");
+        || !(kind.equals("discussion")
+            || kind.equals("summary")
+            || kind.equals("live")
+            || kind.equals("digests"))) throw new IllegalArgumentException("model");
+    if (kind.equals("discussion")) digests(c);
     c.getSharedPreferences("models", 0).edit().putString(kind, model).apply();
   }
 

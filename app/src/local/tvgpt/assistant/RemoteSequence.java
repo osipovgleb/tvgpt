@@ -23,6 +23,8 @@ final class RemoteSequence {
         if (sent < keys.size()) time.sleep(100);
       }
       return "Отправлено нажатий в последовательности: " + sent + ". Проверь результат";
+    } catch (java.util.concurrent.CancellationException cancelled) {
+      throw cancelled;
     } catch (InterruptedException cancelled) {
       Thread.currentThread().interrupt();
       throw cancelled;

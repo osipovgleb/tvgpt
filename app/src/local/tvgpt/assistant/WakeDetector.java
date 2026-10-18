@@ -4,8 +4,9 @@ import android.content.Context;
 import android.media.*;
 import android.util.Log;
 import java.io.*;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.zip.*;
 import org.json.JSONObject;
 import org.vosk.Model;
@@ -15,9 +16,10 @@ import org.vosk.Recognizer;
 final class WakeDetector {
   private final Context context;
   private final Runnable wake;
-  private final ExecutorService executor = Executors.newSingleThreadExecutor();
+  private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
+  private final WakeRecovery recovery = new WakeRecovery();
   private final Object lock = new Object();
-  private volatile boolean wanted, closed;
+  private volatile boolean closed;
   private volatile AudioRecord capture;
   private Model model;
 
@@ -26,14 +28,17 @@ final class WakeDetector {
     this.wake = wake;
   }
 
-  void start() {
-    if (closed || wanted) return;
-    wanted = true;
-    executor.execute(this::listen);
+  synchronized void start() {
+    long ticket = recovery.start();
+    if (ticket >= 0) executor.execute(() -> listen(ticket));
   }
 
   void stop() {
-    wanted = false;
+    recovery.stop();
+    releaseCapture();
+  }
+
+  private void releaseCapture() {
     synchronized (lock) {
       AudioRecord r = capture;
       capture = null;
@@ -52,15 +57,17 @@ final class WakeDetector {
     if (closed) return;
     executor.execute(
         () -> {
-          if (!wanted && model != null) {
+          if (capture == null && model != null) {
             model.close();
             model = null;
           }
         });
   }
 
-  void close() {
+  synchronized void close() {
+    if (closed) return;
     closed = true;
+    recovery.close();
     stop();
     executor.execute(
         () -> {
@@ -104,18 +111,19 @@ final class WakeDetector {
     return new File(folder, "vosk-model-small-ru-0.22");
   }
 
-  private void listen() {
+  private void listen(long ticket) {
+    if (!recovery.active(ticket)) return;
     try {
       if (model == null) {
         Log.i("TVGPTWake", "Loading local Russian wake model");
         model = new Model(unpack().getPath());
       }
-      if (!wanted || closed) return;
+      if (!recovery.active(ticket)) return;
       try (Recognizer recognizer =
           new Recognizer(model, 16000, "[\"привет телевизор\",\"окей телевизор\",\"[unk]\"]")) {
         AudioRecord record;
         synchronized (lock) {
-          if (!wanted || closed) return;
+          if (!recovery.active(ticket)) return;
           int minimum =
               AudioRecord.getMinBufferSize(
                   16000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
@@ -136,7 +144,7 @@ final class WakeDetector {
         Log.i("TVGPTWake", "Listening locally: Привет, телевизор");
         byte[] bytes = new byte[3200];
         long samples = 0;
-        while (wanted && !closed) {
+        while (recovery.active(ticket)) {
           int count;
           synchronized (lock) {
             if (capture != record) break;
@@ -153,8 +161,10 @@ final class WakeDetector {
               new JSONObject(finalResult ? recognizer.getResult() : recognizer.getPartialResult());
           if (WakePhrase.matches(result.optString(finalResult ? "text" : "partial"))) {
             Log.i("TVGPTWake", "Wake phrase recognized after samples=" + samples);
-            stop();
-            wake.run();
+            if (recovery.consume(ticket)) {
+              releaseCapture();
+              wake.run();
+            }
             break;
           }
         }
@@ -163,7 +173,15 @@ final class WakeDetector {
       Log.e(
           "TVGPTWake",
           "Local wake unavailable: " + e.getClass().getSimpleName() + ": " + e.getMessage());
-      stop();
+      releaseCapture();
+      long delay = recovery.retryDelay(ticket);
+      if (delay >= 0) {
+        try {
+          executor.schedule(() -> listen(ticket), delay, TimeUnit.MILLISECONDS);
+        } catch (java.util.concurrent.RejectedExecutionException ignored) {
+          // Disposal invalidated the retry while this failed recorder unwound.
+        }
+      }
     }
   }
 }

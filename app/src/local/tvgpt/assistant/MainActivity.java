@@ -54,6 +54,9 @@ public class MainActivity extends Activity {
       case REMINDERS:
         page = new RemindersScreen(this);
         break;
+      case DIGESTS:
+        page = new DigestsScreen(this, getIntent().getStringExtra("digest_id"));
+        break;
       case APPEARANCE:
         page = new AppearanceScreen(this);
         break;

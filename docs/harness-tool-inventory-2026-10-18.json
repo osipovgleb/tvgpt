@@ -1,0 +1,56 @@
+{
+  "AgentTools.java": [
+    "task_result",
+    "task_status",
+    "task_cancel",
+    "search_app",
+    "type_text",
+    "media_control",
+    "load_app_skill",
+    "open_app",
+    "volume",
+    "screenshot",
+    "tap",
+    "mute",
+    "list_apps",
+    "wait_for_screen",
+    "read_screen",
+    "navigate",
+    "click",
+    "end_conversation",
+    "navigate_sequence"
+  ],
+  "KnowledgeTools.java": [
+    "knowledge_list",
+    "knowledge_read",
+    "knowledge_save",
+    "knowledge_delete"
+  ],
+  "ConversationTools.java": [
+    "conversation_search",
+    "conversation_read"
+  ],
+  "ReminderTools.java": [
+    "reminder_list",
+    "reminder_cancel",
+    "timer_create",
+    "reminder_create"
+  ],
+  "digests/DigestToolContract.java": [
+    "digest_list",
+    "digest_read",
+    "digest_mutate",
+    "digest_source_list",
+    "digest_source_search",
+    "digest_source_mutate",
+    "digest_schedule_list",
+    "digest_schedule_mutate",
+    "digest_refresh",
+    "digest_job_read",
+    "digest_cover_generate",
+    "digest_open"
+  ],
+  "hosted": [
+    "web_search"
+  ]
+}

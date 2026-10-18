@@ -34,6 +34,8 @@ class TvTools {
 
   TvTools(android.content.Context c) {}
 
+  TvTools(android.content.Context c, CancellationToken token) {}
+
   String execute(String name, JSONObject args) {
     actions++;
     return "Нажатие выполнено";
@@ -47,7 +49,7 @@ class ScreenCapture {
 }
 
 class Http {
-  static String lastTier, lastEffort, lastRouting;
+  static String lastTier, lastEffort, lastRouting, lastInstructions;
   static String toolName = "navigate";
   static JSONArray lastInput;
   static volatile Runnable beforePost;
@@ -62,10 +64,20 @@ class Http {
     void requireSuccess() {}
   }
 
+  static Reply post(
+      String url, String body, String type, Map<String, String> headers, CancellationToken token)
+      throws Exception {
+    token.check();
+    Reply reply = post(url, body, type, headers);
+    token.check();
+    return reply;
+  }
+
   static Reply post(String url, String body, String type, Map<String, String> headers)
       throws Exception {
     if (beforePost != null) beforePost.run();
     JSONObject request = new JSONObject(body);
+    lastInstructions = request.optString("instructions");
     lastRouting = headers.get("x-codex-routing-hint");
     lastTier = request.optString("service_tier");
     lastEffort =
@@ -128,6 +140,12 @@ class Http {
 }
 
 class KnowledgeTools {
+  static Object execute(
+      android.content.Context c, String n, JSONObject a, CancellationToken token) {
+    token.check();
+    return execute(c, n, a);
+  }
+
   static Object execute(android.content.Context c, String n, JSONObject a) {
     TvTools.actions++;
     return new JSONObject().put("saved_id", 12);
@@ -137,6 +155,12 @@ class KnowledgeTools {
 }
 
 class ReminderTools {
+  static Object execute(
+      android.content.Context c, String n, JSONObject a, CancellationToken token) {
+    token.check();
+    return execute(c, n, a);
+  }
+
   static java.time.ZonedDateTime currentTime(android.content.Context c) {
     return java.time.ZonedDateTime.now();
   }
@@ -187,5 +211,19 @@ class ModelSettings {
 
   static String live(android.content.Context c) {
     return "gpt-live-1-codex";
+  }
+}
+
+final class DigestTools {
+  static String execute(
+      android.content.Context c, String n, JSONObject a, CancellationToken token) {
+    token.check();
+    return execute(c, n, a);
+  }
+
+  static void schemas(org.json.JSONArray out) {}
+
+  static String execute(android.content.Context c, String name, org.json.JSONObject args) {
+    return "{}";
   }
 }

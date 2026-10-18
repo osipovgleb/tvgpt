@@ -5,6 +5,7 @@ public final class AppNavigation {
     CONVERSATIONS,
     KNOWLEDGE,
     REMINDERS,
+    DIGESTS,
     APPEARANCE,
     ACCESS
   }

@@ -6,6 +6,10 @@ import java.util.*;
 /** Bounded semantic click lookup. Consumes the supplied root and releases all node handles. */
 final class AccessibleClick {
   static boolean perform(AccessibilityNodeInfo root, String label) {
+    return perform(root, label, CancellationToken.NONE);
+  }
+
+  static boolean perform(AccessibilityNodeInfo root, String label, CancellationToken token) {
     if (root == null) return false;
     List<AccessibilityNodeInfo> targets = new ArrayList<>();
     List<Integer> ranks = new ArrayList<>();
@@ -23,6 +27,7 @@ final class AccessibleClick {
               + (chosen < 0 && scores.length > 0)
               + " truncated="
               + (remaining[0] <= 0));
+      token.check();
       // A truncated tree cannot establish that a label identifies only one target.
       return remaining[0] > 0
           && chosen >= 0

@@ -13,6 +13,16 @@ public class LiveProtocolTest {
     if (!speech.optString("channel").equals("speakable")
         || !speech.optString("type").equals("session.context.append"))
       throw new AssertionError("Preview needs explicit speakable output, not inert user context");
+    JSONObject resultUpdate =
+        LiveProtocol.delegationResult(
+            "d1", "{\"status\":\"observed\",\"speech\":\"Открыто\"}", false);
+    if (resultUpdate.has("channel") || !resultUpdate.optString("delegation_item_id").equals("d1"))
+      throw new AssertionError(
+          "Backend facts must not force stale speech over the current user turn");
+    if (!LiveProtocol.delegationResult("current", "Готово", true)
+        .optString("channel")
+        .equals("speakable"))
+      throw new AssertionError("Current task result must be heard promptly");
     JSONObject d =
         new JSONObject(
             "{\"type\":\"delegation.created\",\"item\":{\"id\":\"d1\",\"type\":\"delegation\",\"target\":\"client\",\"content\":[{\"type\":\"input_text\",\"text\":\"Открой"

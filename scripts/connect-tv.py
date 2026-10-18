@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Rebind this app after an APK update; preserve unrelated accessibility services."""
-import os,shlex,subprocess,sys,time
+import os,re,shlex,subprocess,sys,time
 adb=os.environ.get('ADB','/home/gleb/.local/share/android/platform-tools/adb')
 serial=sys.argv[1] if len(sys.argv)>1 else '192.168.3.5:5555'
 def shell(*args):
@@ -8,6 +8,18 @@ def shell(*args):
 def bound_services():
  records=shell('dumpsys','activity','services','local.tvgpt.assistant').split('* ServiceRecord')
  return all(any('/.'+name+'}' in record.split('\n',1)[0] and 'app=ProcessRecord{' in record for record in records) for name in ('AssistantService','TvAccessibility'))
+# Only change OEM operations that the firmware actually exposes for this package.
+startup_changed=False
+for operation in ('APP_AUTO_START','APP_ASSOC_START'):
+ try: current=shell('cmd','appops','get','--user','0','local.tvgpt.assistant',operation)
+ except subprocess.CalledProcessError: continue
+ if not re.search(r'\b'+operation+r':\s+(allow|ignore|deny|default)\b',current):continue
+ if operation+': allow' not in current:
+  shell('cmd','appops','set','--user','0','local.tvgpt.assistant',operation,'allow')
+  if operation+': allow' not in shell('cmd','appops','get','--user','0','local.tvgpt.assistant',operation):
+   raise SystemExit('OEM startup permission did not apply: '+operation)
+  startup_changed=True
+if startup_changed:shell('cmd','appops','write-settings')
 component='local.tvgpt.assistant/.AssistantService'
 if (shell('settings','get','secure','assistant')==component
     and shell('settings','get','secure','voice_interaction_service')==component and bound_services()):

@@ -43,6 +43,11 @@ final class AdbRemote {
   }
 
   static String key(Context c, String direction) throws Exception {
+    return key(c, direction, CancellationToken.NONE);
+  }
+
+  static String key(Context c, String direction, CancellationToken token) throws Exception {
+    token.check();
     int code;
     switch (direction) {
       case "pause":
@@ -76,8 +81,8 @@ final class AdbRemote {
         throw new Exception("Неизвестная кнопка пульта");
     }
     try {
-      RemoteFocus.begin(direction);
-      shell(c, "input keyevent " + code);
+      RemoteFocus.begin(direction, token);
+      shell(c, "input keyevent " + code, 10000, token);
     } finally {
       RemoteFocus.end();
     }
@@ -88,11 +93,43 @@ final class AdbRemote {
     return shell(context, command, 10000);
   }
 
+  /** OPEN may have reached adbd; callers must not retry via another transport. */
+  static final class DispatchException extends IOException {
+    DispatchException(Exception cause) {
+      super("ADB command may have been dispatched", cause);
+    }
+  }
+
   static String shell(Context context, String command, int timeoutMs) throws Exception {
-    long deadline = android.os.SystemClock.elapsedRealtime() + timeoutMs;
+    return shell(context, command, timeoutMs, CancellationToken.NONE);
+  }
+
+  static String shell(Context context, String command, int timeoutMs, CancellationToken token)
+      throws Exception {
+    token.check();
     KeyPair pair = keys(context);
-    try (Socket socket = new Socket()) {
-      socket.connect(new InetSocketAddress("127.0.0.1", 5555), Math.min(1500, timeoutMs));
+    token.check();
+    return shellOnSocket(new Socket(), command, pair, timeoutMs, token);
+  }
+
+  // Connected sockets let host tests exercise real wire failure/cancellation boundaries.
+  static String shellOnSocket(
+      Socket socket, String command, KeyPair pair, int timeoutMs, CancellationToken token)
+      throws Exception {
+    long deadline = android.os.SystemClock.elapsedRealtime() + timeoutMs;
+    boolean dispatched = false;
+    try (Socket ownedSocket = socket;
+        CancellationToken.Registration registration =
+            token.onCancel(
+                () -> {
+                  try {
+                    socket.close();
+                  } catch (IOException ignored) {
+                  }
+                })) {
+      token.check();
+      if (!socket.isConnected())
+        socket.connect(new InetSocketAddress("127.0.0.1", 5555), Math.min(1500, timeoutMs));
       socket.setSoTimeout(timeoutMs);
       InputStream in = socket.getInputStream();
       OutputStream out = socket.getOutputStream();
@@ -100,6 +137,7 @@ final class AdbRemote {
       boolean signed = false, offered = false;
       AdbWire.Packet packet;
       while (true) {
+        token.check();
         socket.setSoTimeout(remaining(deadline));
         try {
           packet = AdbWire.read(in);
@@ -124,10 +162,14 @@ final class AdbRemote {
           offered = true;
         } else throw new Exception("Разрешение пульта ADB не принято");
       }
+      token.check();
+      // Mark before writing: even a partial write can dispatch the command.
+      dispatched = true;
       AdbWire.send(out, AdbWire.OPEN, 1, 0, ("shell:" + command + "\0").getBytes("UTF-8"));
       ByteArrayOutputStream result = new ByteArrayOutputStream();
       int remote = 0;
       while (true) {
+        token.check();
         socket.setSoTimeout(remaining(deadline));
         packet = AdbWire.read(in);
         if (packet.command == AdbWire.OKAY) {
@@ -149,7 +191,14 @@ final class AdbRemote {
       if (text.contains("Error:")
           || text.contains("Exception")
           || text.contains("Permission denied")) throw new IOException("TV rejected remote input");
+      token.check();
       return text;
+    } catch (java.util.concurrent.CancellationException cancelled) {
+      throw cancelled;
+    } catch (Exception failure) {
+      token.check();
+      if (dispatched) throw new DispatchException(failure);
+      throw failure;
     }
   }
 

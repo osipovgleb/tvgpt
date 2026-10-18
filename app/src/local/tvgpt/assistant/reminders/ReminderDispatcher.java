@@ -3,8 +3,6 @@ package local.tvgpt.assistant.reminders;
 import android.app.*;
 import android.content.*;
 import android.os.*;
-import android.speech.tts.*;
-import java.util.*;
 import java.util.concurrent.*;
 import local.tvgpt.assistant.data.ReminderRepository;
 import org.json.*;
@@ -13,7 +11,24 @@ public final class ReminderDispatcher {
   private static final ExecutorService IO =
       Executors.newSingleThreadExecutor(r -> new Thread(r, "tvgpt-reminders"));
 
+  private static final java.util.concurrent.atomic.AtomicBoolean recovered =
+      new java.util.concurrent.atomic.AtomicBoolean();
+  // Accessed only by IO, including every asynchronous completion.
+  private static boolean delivering;
+
   private ReminderDispatcher() {}
+
+  public static void onProcessStart(Context c) {
+    Context app = c.getApplicationContext();
+    submit(() -> onDue(app));
+  }
+
+  private static void recover(Context c) {
+    if (!recovered.get()) {
+      new ReminderRepository(c).recoverInterrupted();
+      recovered.set(true);
+    }
+  }
 
   public static void submit(Runnable action) {
     IO.submit(action);
@@ -29,44 +44,73 @@ public final class ReminderDispatcher {
   }
 
   public static void onDue(Context c) {
-    // Rebase duration timers before comparing calendar deadlines after TIME_SET.
-    AlarmScheduler.reconcile(c);
+    recover(c);
+    if (delivering) return;
     ReminderRepository repo = new ReminderRepository(c);
     long now = System.currentTimeMillis();
+    AlarmScheduler.reconcile(c);
     repo.deferDue(now);
-    if (!interactive(c)) {
-      AlarmScheduler.reconcile(c);
-      return;
-    }
+    AlarmScheduler.reconcile(c);
+    if (!interactive(c)) return;
     JSONArray due = repo.pending(now);
-    StringBuilder message = new StringBuilder();
-    for (int i = 0; i < due.length(); i++) {
-      if (!interactive(c)) break;
-      JSONObject item = due.optJSONObject(i);
-      if (!repo.claim(item.optLong("id"))) continue;
-      String outcome = "completed";
+    delivering = true;
+    deliverNext(c, repo, due, 0);
+  }
+
+  private static void deliverNext(Context c, ReminderRepository repo, JSONArray due, int index) {
+    while (index < due.length() && interactive(c)) {
+      JSONObject item = due.optJSONObject(index++);
+      if (!repo.claim(item.optLong("id"), item.optLong("revision"))) continue;
+      String action = null;
       try {
         if (item.optString("kind").equals("ACTION")) {
           if (!interactive(c)) throw new IllegalStateException("screen off");
-          outcome = local.tvgpt.assistant.ReminderActions.execute(c, item.optString("action"));
+          action = local.tvgpt.assistant.ReminderActions.execute(c, item.optString("action"));
         }
-        if (message.length() < 1500) message.append(item.optString("body")).append(". ");
       } catch (Exception e) {
-        outcome = "failed";
+        // The action adapter preserves unconfirmed transport dispatch outcomes.
+        action = "unconfirmed";
       }
-      repo.finish(item, outcome);
+      String actionOutcome = action;
+      int nextIndex = index;
+      // Deliver every body independently. There is no aggregate truncation or QUEUE_FLUSH race.
+      String message = item.optString("body");
+      boolean notified = notify(c, item.optLong("id"), message);
+      ReminderSpeech.speak(
+          c,
+          message,
+          spoken ->
+              submit(
+                  () -> {
+                    try {
+                      repo.finish(item, DeliveryOutcome.combine(actionOutcome, notified, spoken));
+                      deliverNext(c, repo, due, nextIndex);
+                    } catch (RuntimeException e) {
+                      delivering = false;
+                      android.util.Log.w("TVGPTReminders", "Delivery completion unavailable", e);
+                      AlarmScheduler.reconcile(c);
+                    }
+                  }));
+      return;
     }
-    if (message.length() > 0 && interactive(c)) notifyAndSpeak(c, message.toString());
+    delivering = false;
+    // A bounded batch may leave due rows. nextDue includes pending while interactive.
     AlarmScheduler.reconcile(c);
   }
 
-  private static void notifyAndSpeak(Context c, String message) {
-    NotificationManager notifications = c.getSystemService(NotificationManager.class);
-    notifications.createNotificationChannel(
-        new NotificationChannel(
-            "reminders", "Напоминания", NotificationManager.IMPORTANCE_DEFAULT));
+  private static boolean notify(Context c, long id, String message) {
+    if (!interactive(c)) return false;
     try {
+      NotificationManager notifications = c.getSystemService(NotificationManager.class);
+      notifications.createNotificationChannel(
+          new NotificationChannel(
+              "reminders", "Напоминания", NotificationManager.IMPORTANCE_DEFAULT));
+      NotificationChannel channel = notifications.getNotificationChannel("reminders");
+      if (!notifications.areNotificationsEnabled()
+          || (channel != null && channel.getImportance() == NotificationManager.IMPORTANCE_NONE))
+        return false;
       notifications.notify(
+          "reminder-" + id,
           51,
           new Notification.Builder(c, "reminders")
               .setSmallIcon(android.R.drawable.ic_dialog_info)
@@ -75,10 +119,11 @@ public final class ReminderDispatcher {
               .setStyle(new Notification.BigTextStyle().bigText(message))
               .setAutoCancel(true)
               .build());
-    } catch (SecurityException e) {
-      android.util.Log.w("TVGPTReminders", "Notification access unavailable");
+      local.tvgpt.assistant.ReminderPopup.show(message);
+      return true;
+    } catch (RuntimeException e) {
+      android.util.Log.w("TVGPTReminders", "Notification unavailable", e);
+      return false;
     }
-    local.tvgpt.assistant.ReminderPopup.show(message);
-    ReminderSpeech.speak(c, message);
   }
 }

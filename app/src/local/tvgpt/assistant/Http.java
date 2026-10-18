@@ -28,34 +28,59 @@ final class Http {
 
   static Reply post(String url, String body, String contentType, Map<String, String> headers)
       throws Exception {
+    return post(url, body, contentType, headers, CancellationToken.NONE);
+  }
+
+  static Reply post(
+      String url,
+      String body,
+      String contentType,
+      Map<String, String> headers,
+      CancellationToken token)
+      throws Exception {
+    token.check();
     HttpsURLConnectionSafe check = new HttpsURLConnectionSafe(url);
+    token.check();
     HttpURLConnection c = (HttpURLConnection) check.url.openConnection();
-    c.setConnectTimeout(15000);
-    c.setReadTimeout(45000);
-    c.setInstanceFollowRedirects(false);
-    c.setRequestMethod("POST");
-    c.setDoOutput(true);
-    c.setRequestProperty("Content-Type", contentType);
-    c.setRequestProperty("User-Agent", "tvgpt/0.1 Android");
-    for (Map.Entry<String, String> h : headers.entrySet())
-      c.setRequestProperty(h.getKey(), h.getValue());
-    try {
+    try (CancellationToken.Registration registration = token.onCancel(c::disconnect)) {
+      token.check();
+      c.setConnectTimeout(15000);
+      c.setReadTimeout(45000);
+      c.setInstanceFollowRedirects(false);
+      c.setRequestMethod("POST");
+      c.setDoOutput(true);
+      c.setRequestProperty("Content-Type", contentType);
+      c.setRequestProperty("User-Agent", "tvgpt/0.1 Android");
+      for (Map.Entry<String, String> h : headers.entrySet())
+        c.setRequestProperty(h.getKey(), h.getValue());
+      token.check();
       try (OutputStream out = c.getOutputStream()) {
+        token.check();
         out.write(body.getBytes("UTF-8"));
       }
+      token.check();
       int code = c.getResponseCode();
+      token.check();
       InputStream in = code >= 400 ? c.getErrorStream() : c.getInputStream();
       ByteArrayOutputStream data = new ByteArrayOutputStream();
       if (in != null)
         try (InputStream stream = in) {
           byte[] b = new byte[8192];
-          int n;
-          while ((n = stream.read(b)) != -1) {
+          while (true) {
+            token.check();
+            int n = stream.read(b);
+            token.check();
+            if (n == -1) break;
             if (data.size() + n > 8 * 1024 * 1024) throw new IOException("Ответ слишком большой");
             data.write(b, 0, n);
           }
         }
+      token.check();
       return new Reply(code, data.toString("UTF-8"), c.getHeaderField("Location"));
+    } catch (Exception failure) {
+      // Disconnect commonly surfaces as IOException; cancellation remains distinguishable.
+      token.check();
+      throw failure;
     } finally {
       c.disconnect();
     }

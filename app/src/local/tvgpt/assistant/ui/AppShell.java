@@ -10,10 +10,15 @@ import local.tvgpt.assistant.SettingsGlyph;
 
 public final class AppShell extends LinearLayout {
   private final FrameLayout content;
-  private final LinearLayout[] rows = new LinearLayout[5];
-  private final TextView[] labels = new TextView[5];
+  private final LinearLayout[] rows = new LinearLayout[6];
+  private final TextView[] labels = new TextView[6];
   private final Route[] routes = {
-    Route.CONVERSATIONS, Route.KNOWLEDGE, Route.REMINDERS, Route.APPEARANCE, Route.ACCESS
+    Route.CONVERSATIONS,
+    Route.KNOWLEDGE,
+    Route.REMINDERS,
+    Route.DIGESTS,
+    Route.APPEARANCE,
+    Route.ACCESS
   };
 
   public AppShell(Context c, Consumer<Route> navigate) {
@@ -35,12 +40,13 @@ public final class AppShell extends LinearLayout {
     logoParams.bottomMargin = Screens.dp(c, 12);
     menu.addView(logo, logoParams);
     String[] names = {
-      "Разговоры", "Общие знания", "Напоминания", "Настройки ассистента", "Настройки"
+      "Разговоры", "Общие знания", "Напоминания", "Дайджесты", "Настройки ассистента", "Настройки"
     };
     int[] icons = {
       SettingsGlyph.CHAT,
       SettingsGlyph.BOOK,
       SettingsGlyph.CLOCK,
+      SettingsGlyph.BOOK,
       SettingsGlyph.PALETTE,
       SettingsGlyph.SHIELD
     };

@@ -4,40 +4,21 @@ import java.util.*;
 import org.json.*;
 
 final class LiveProtocol {
-  // A dedicated command avoids sending a goodbye through the expensive agent loop.
-  static boolean localEndDelegation(String text) {
-    return text != null
-        && (text.trim().equals("TVGPT_END_CONVERSATION") || EndPhrase.matches(text));
-  }
-
-  static String localMediaAction(String text) {
-    if (text == null) return null;
-    if (text.trim().equals("TVGPT_MEDIA_PAUSE")) return "pause";
-    if (text.trim().equals("TVGPT_MEDIA_PLAY")) return "play";
-    String words = EndPhrase.normalized(text);
-    if (java.util.Arrays.asList(
-            "пауза", "поставь на паузу", "поставь видео на паузу", "приостанови видео")
-        .contains(words)) return "pause";
-    if (java.util.Arrays.asList(
-            "продолжи воспроизведение", "возобнови воспроизведение", "продолжи видео")
-        .contains(words)) return "play";
-    return null;
-  }
-
-  static boolean endsConversation(JSONObject event) {
-    JSONObject turn = event.optJSONObject("turn");
-    return event.optString("type").equals("turn.done")
-        && turn != null
-        && turn.optString("role").equals("user")
-        && EndPhrase.finalTranscript(turn.optString("transcript"));
-  }
-
   static JSONObject userInput(String text) throws Exception {
     return new JSONObject()
         .put("type", "session.context.append")
         .put(
             "content",
             new JSONArray().put(new JSONObject().put("type", "input_text").put("text", text)));
+  }
+
+  // Current results may speak. Late results use the upstream default context channel
+  // so they cannot force an old answer over a newer user request.
+  static JSONObject delegationResult(String id, String text, boolean current) throws Exception {
+    JSONObject result =
+        userInput(text).put("type", "delegation.context.append").put("delegation_item_id", id);
+    if (current) result.put("channel", "speakable");
+    return result;
   }
 
   static JSONObject speechOutput(String text) throws Exception {

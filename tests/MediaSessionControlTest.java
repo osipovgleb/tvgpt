@@ -68,6 +68,43 @@ public final class MediaSessionControlTest {
         MediaSessionControl.requestedName(new JSONObject().put("name", "  Music  "))
             .equals("Music"),
         "explicit app name lost");
+    final int[] cancelledCommands = {0};
+    try {
+      MediaSessionControl.execute(
+          (command, timeout) -> {
+            cancelledCommands[0]++;
+            if (command.equals("dumpsys media_session")) {
+              Thread.currentThread().interrupt();
+              return PLAYING;
+            }
+            throw new AssertionError("media mutation dispatched after cancelled initial read");
+          },
+          new Fake(),
+          "pause",
+          "com.music");
+      throw new AssertionError("cancelled read returned normally");
+    } catch (InterruptedException | java.util.concurrent.CancellationException expected) {
+      check(cancelledCommands[0] == 1, "read cancellation performed mutation");
+    } finally {
+      Thread.interrupted();
+    }
+    CancellationToken token = new CancellationToken();
+    final int[] tokenCommands = {0};
+    try {
+      MediaSessionControl.execute(
+          (command, timeout) -> {
+            tokenCommands[0]++;
+            token.cancel();
+            return PLAYING;
+          },
+          new Fake(),
+          "pause",
+          "com.music",
+          token);
+      throw new AssertionError("explicit cancellation after read accepted");
+    } catch (java.util.concurrent.CancellationException expected) {
+      check(tokenCommands[0] == 1, "explicit cancellation dispatched media command");
+    }
     Fake f = new Fake();
     f.before +=
         session("Bluetooth", "com.bluetooth", 1002, 7, false)

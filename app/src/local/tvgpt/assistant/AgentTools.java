@@ -40,15 +40,69 @@ final class AgentTools {
                     new JSONObject().put("type", new JSONArray().put("string").put("null")))));
   }
 
+  private static void taskTools(JSONArray result) throws Exception {
+    result.put(
+        tool(
+            "task_result",
+            "Итог поручения после действий. Ссылайся на receipt_id, явно указанные внутри свежих"
+                + " результатов инструментов. observed требует проверки ожидаемой цели; открытие"
+                + " приложения не доказывает выбор контента. Не повторяй действия ради"
+                + " подтверждения.",
+            new JSONObject()
+                .put(
+                    "status",
+                    new JSONObject()
+                        .put("type", "string")
+                        .put(
+                            "enum",
+                            new JSONArray()
+                                .put("answer")
+                                .put("observed")
+                                .put("queued")
+                                .put("requested")
+                                .put("unconfirmed")
+                                .put("failed")
+                                .put("cancelled")))
+                .put(
+                    "goal_scope",
+                    new JSONObject()
+                        .put("type", "string")
+                        .put(
+                            "enum",
+                            new JSONArray()
+                                .put("app")
+                                .put("content")
+                                .put("setting")
+                                .put("data")
+                                .put("answer")))
+                .put("speech", new JSONObject().put("type", "string"))
+                .put(
+                    "evidence_ids",
+                    new JSONObject()
+                        .put("type", "array")
+                        .put("items", new JSONObject().put("type", "string")))));
+
+    result.put(
+        tool("task_status", "Список текущих выполняемых поручений и их ID.", new JSONObject()));
+    result.put(
+        tool(
+            "task_cancel",
+            "Отменить другое выполняемое поручение по ID при отмене или исправлении пользователем."
+                + " Текущее исполняемое поручение отменять нельзя. Уже выполненные действия не"
+                + " откатываются.",
+            new JSONObject().put("task_id", new JSONObject().put("type", "string"))));
+  }
+
   static JSONArray all() throws Exception {
     JSONArray result = new JSONArray();
+    taskTools(result);
     result.put(new JSONObject().put("type", "web_search").put("external_web_access", true));
     result.put(
         tool(
             "load_app_skill",
-            "Прочитать встроенный навык приложения. Сейчас доступен youtube /"
-                + " com.google.android.youtube.tv. Загружай один раз за разговор; для других"
-                + " приложений используй общий app-search.",
+            "Прочитать встроенный навык: imagegen (генерация обложек) или youtube /"
+                + " com.google.android.youtube.tv. Загружай нужный навык один раз за разговор;"
+                + " для поиска в других приложениях используй общий app-search.",
             new JSONObject().put("name", new JSONObject().put("type", "string"))));
     result.put(
         tool(
@@ -85,6 +139,7 @@ final class AgentTools {
     KnowledgeTools.schemas(result);
     ConversationTools.schemas(result);
     ReminderTools.schemas(result);
+    DigestTools.schemas(result);
     return result;
   }
 

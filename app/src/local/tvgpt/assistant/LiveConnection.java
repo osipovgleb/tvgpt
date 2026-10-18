@@ -7,6 +7,23 @@ import okhttp3.*;
 import org.json.*;
 
 final class LiveConnection {
+  private static volatile LiveConnection diagnosticOwner;
+
+  static String diagnostics() {
+    LiveConnection current = diagnosticOwner;
+    if (current == null) return "No active Live call";
+    try {
+      return new JSONObject()
+          .put("call", current.workspace.id)
+          .put("ending", current.ending.get())
+          .put("tasks", current.tasks.status())
+          .put("turns", current.callContext.snapshot("", ""))
+          .toString();
+    } catch (Exception failure) {
+      return "Diagnostics unavailable: " + failure.getClass().getSimpleName();
+    }
+  }
+
   interface Listener {
     void answer(String sdp);
 
@@ -21,13 +38,11 @@ final class LiveConnection {
 
   private final Context context;
   private final Listener listener;
-  private final Agent agent;
-  private final SpeechStop speechStop = new SpeechStop();
-  private final ScheduledExecutorService controls = Executors.newSingleThreadScheduledExecutor();
-  private final ScheduledExecutorService stopTimer = Executors.newSingleThreadScheduledExecutor();
-  private ScheduledFuture<?> pendingStop;
-  private String lastMedia = "";
-  private long lastMediaAt;
+  private final CancellationToken cancellation = new CancellationToken();
+  private final CallContext callContext = new CallContext();
+  private final TaskHarness tasks = new TaskHarness();
+  private final ExecutorService taskWorkers =
+      new ThreadPoolExecutor(0, 8, 30L, TimeUnit.SECONDS, new SynchronousQueue<Runnable>());
   private final java.util.concurrent.atomic.AtomicBoolean ending =
       new java.util.concurrent.atomic.AtomicBoolean();
   private final SessionStore.State workspace;
@@ -49,13 +64,7 @@ final class LiveConnection {
     context = c.getApplicationContext();
     listener = l;
     workspace = SessionWorkspace.open(context);
-    agent =
-        new Agent(
-            context,
-            workspace,
-            () -> {
-              requestLocalEnd("agent_end_tool");
-            });
+    diagnosticOwner = this;
   }
 
   static Map<String, String> headers(JSONObject account) throws Exception {
@@ -72,7 +81,9 @@ final class LiveConnection {
         () -> {
           try {
             listener.status("Подключаю GPT-Live…");
+            cancellation.check();
             JSONObject account = new AccountStore(context).fresh();
+            cancellation.check();
             Map<String, String> h = headers(account);
             h.put("session-id", workspace.id);
             h.put("thread-id", workspace.id);
@@ -83,7 +94,9 @@ final class LiveConnection {
                     "https://chatgpt.com/backend-api/codex/realtime/calls?intent=quicksilver&architecture=avas",
                     new JSONObject().put("sdp", sdp).put("session", session).toString(),
                     "application/json",
-                    h);
+                    h,
+                    cancellation);
+            cancellation.check();
             reply.requireSuccess();
             String id = Protocol.callId(reply.location == null ? "" : reply.location);
             if (closed) return;
@@ -134,38 +147,39 @@ final class LiveConnection {
     session.put("model", ModelSettings.live(context));
     session.put(
         "instructions",
-        "Ты голосовой помощник телевизора. Говори по-русски, кратко и естественно. Завершение"
-            + " голосового разговора — управляющее действие клиента. Если пользователь просит"
-            + " закончить этот разговор или явно прощается, первым действием делегируй клиенту"
-            + " просьбу «Завершить текущий голосовой разговор». Делегируй до любой речи; не отвечай"
-            + " вместо этого «хорошо», «завершаю» или «до свидания». Пример: пользователь «На"
-            + " сегодня заканчиваем наше общение» → делегирование клиенту, без устного ответа."
-            + " Просьба не закрывать разговор отменяет завершение. Переход на главный экран или"
-            + " остановка музыки не завершают этот голосовой разговор. Телевизор — место отдыха."
-            + " Общайся как доброжелательный собеседник: отвечай и на обычные вопросы, поддерживай"
-            + " разговор, учитывай уточнения и не своди общение к командам телевизору. Говори"
-            + " естественно, без шаблонных подтверждений. Не озвучивай технические подробности,"
-            + " промежуточные шаги и работу инструментов, если пользователь явно не спросил. Перед"
-            + " поручением, кроме завершения этого разговора, один раз кратко подтверди его"
-            + " естественной фразой и сразу делегируй само поручение в этом же ходе. Подтверждение"
-            + " не заменяет делегирование. Передавай цель, все ограничения и важные уточнения, а не"
-            + " только фразу «сейчас сделаю». Затем жди результат. Не объявляй ни успех, ни ошибку"
-            + " до результата исполнителя. При подключении молча жди запроса: приветствие и слова"
-            + " «да, слушаю» не нужны, приложение играет короткий сигнал. Когда пользователь просит"
-            + " открыть приложение, управлять телевизором или выяснить что на экране, передай"
-            + " поручение клиенту через делегирование. Не читай технические команды вслух. Не"
-            + " заявляй об успешном действии без результата исполнителя. Вопросы о текущих"
-            + " событиях, погоде и явный запрос поиска в интернете передавай исполнителю: у него"
-            + " есть web_search. Перед поручением можно один раз коротко сказать «Сейчас посмотрю»"
-            + " или похожую естественную фразу. Не повторяй её и не озвучивай технические шаги или"
-            + " длинные URL. Источники сохраняются в истории разговора. Поиск контента для"
-            + " просмотра или прослушивания всегда делегируй как задачу найти в подходящем"
-            + " установленном приложении; исполнитель проверит доступные сервисы. Не подменяй его"
-            + " веб-поиском. Если приложения нет, можно искать в интернете. Справочные вопросы о"
-            + " выходе фильма/дате/фактах можно сразу поручать как веб-поиск. Сохраняй ограничения"
-            + " исходного запроса при уточнениях (например 4K). Не говори «включил», «нашёл» или"
-            + " «не удалось» до результата исполнителя и проверки; промежуточное подтверждение —"
-            + " только намерение.");
+        "Ты голосовой помощник телевизора. Общайся кратко и естественно, без технических"
+            + " подробностей. Отвечай на языке пользователя; по умолчанию — по-русски. При"
+            + " подключении молчи: приложение уже играет короткий сигнал.\n\n"
+            + "Backchannel policy: Не перебивай пользователя и не повторяй подтверждения.\n\n"
+            + "Interruption policy: Уступай, когда пользователь перебивает. По смыслу различай"
+            + " паузу речи, отмену задачи, паузу воспроизведения и завершение самого разговора.\n\n"
+            + "Delegation policy:\nBackend tools:\n"
+            + "- Завершение текущего голосового разговора: приложение немедленно закрывает его.\n"
+            + "- Управление ТВ, приложениями и медиаплеерами, чтение экрана и поиск контента.\n"
+            + "- Интернет, актуальные сведения, напоминания, знания и сохранённые беседы.\n"
+            + "Delegate to the backend when:\n"
+            + "- Пользователь хочет закончить общение: определи намерение по смыслу и контексту"
+            + " на любом языке, а не по конкретным словам. Это действие, а не просьба молчать."
+            + " Сразу делегируй просьбу существующему исполнителю: он вызывает end_conversation."
+            + " Не подменяй просьбу вымышленной служебной командой. Не ограничивайся прощанием:"
+            + " без вызова инструмента разговор не закроется."
+            + " Не жди другой задачи или подтверждения. Это правило важнее подтверждений ниже.\n"
+            + "- Нужны действия, сведения с экрана, актуальная информация, сохранение/чтение данных"
+            + " или уточнение уже выполняемой задачи: делегируй полную цель со всеми"
+            + " ограничениями.\n"
+            + "Do not delegate to the backend when:\n"
+            + "- Достаточно обычного разговора, краткого уточнения или уже известного результата.\n"
+            + "Само по себе спасибо может быть благодарностью с продолжением, а просьба остановить"
+            + " видео не завершает голосовой разговор. Учитывай смысл всего запроса.\n"
+            + "Сначала делегируй просьбу, требующую действий. Пока исполнитель работает,"
+            + " разрешено одно короткое естественное подтверждение намерения. Подтверждение"
+            + " не заменяет делегирование: сам ты не отправляешь команды телевизору. При"
+            + " завершении разговора делегируй молча. Не"
+            + " объявляй успех или ошибку без результата исполнителя. Не читай служебные поручения,"
+            + " технические подробности и URL вслух. Для просмотра/прослушивания поручай поиск в"
+            + " подходящем установленном приложении с сохранением уточнений (например 4K); веб —"
+            + " если подходящего приложения нет. Справочные вопросы и явный интернет-поиск"
+            + " делегируй в веб.");
     session.put(
         "audio",
         new JSONObject()
@@ -188,6 +202,17 @@ final class LiveConnection {
             + new local.tvgpt.assistant.settings.AssistantPreferences(context)
                 .preset()
                 .instructions);
+    session.put(
+        "instructions",
+        session.getString("instructions")
+            + " Результат поручения — JSON с status и speech: произноси только естественное"
+            + " содержание speech, никогда названия полей или evidence_ids. Это факты о поручении,"
+            + " а не новая просьба пользователя: учитывай последние реплики и не перебивай их"
+            + " запоздавшим результатом. Отмена, изменение задачи и завершение разговора требуют"
+            + " нового делегирования даже пока прежний исполнитель работает. observed означает"
+            + " проверенный результат, queued — только очередь, requested — только отправку"
+            + " команды, unconfirmed — отсутствие подтверждения, cancelled — отмену. Не повышай"
+            + " очередь, отправку или неопределённость до выполненной цели.");
     return session;
   }
 
@@ -206,14 +231,6 @@ final class LiveConnection {
         if (input != null) android.util.Log.i("TVGPTLiveDiag", input);
       }
       String type = event.optString("type");
-      long now = android.os.SystemClock.uptimeMillis();
-      if (speechStop.accept(event, now)) {
-        requestLocalEnd("final_user_goodbye");
-        return;
-      }
-      if (type.equals("input_transcript.added")
-          || type.equals("session.input_transcript.delta")
-          || type.equals("turn.done")) scheduleSpeechStop(now);
       if (type.equals("error")) {
         JSONObject problem = event.optJSONObject("error");
         if (problem != null)
@@ -227,26 +244,41 @@ final class LiveConnection {
       if (eventTypes.size() < 60 && eventTypes.add(type))
         android.util.Log.i("TVGPTLive", "received type " + type);
       transcriptEvent(event, type);
+      callContext.accept(event);
       if (type.equals("delegation.created") || type.equals("turn.done") || type.equals("error"))
         android.util.Log.i("TVGPTLive", "event " + type);
       String text = LiveProtocol.delegationText(event);
       if (text != null) {
-        if (LiveProtocol.localEndDelegation(text)) {
-          android.util.Log.i("TVGPTSession", "Local end delegation: no agent request");
-          requestLocalEnd("live_end_delegation");
-          return;
-        }
         String id = event.getJSONObject("item").getString("id");
-        if (delegations.add(id)) {
-          String action = LiveProtocol.localMediaAction(text);
-          if (action != null) controls.execute(() -> mediaCommand(id, action));
-          else if (!ending.get()) executor.submit(() -> delegate(id, text));
+        if (delegations.add(id) && !ending.get()) {
+          JSONObject item = event.getJSONObject("item");
+          String inputId =
+              item.optString("user_bidi_turn_id", event.optString("user_bidi_turn_id"));
+          TaskHarness.Task task =
+              tasks.admit(id, inputId, text, callContext.snapshot(inputId, text));
+          if (task != null) {
+            try {
+              taskWorkers.execute(() -> delegate(task));
+            } catch (RejectedExecutionException full) {
+              String busy =
+                  "{\"status\":\"unconfirmed\",\"speech\":\"Сейчас не удалось начать поручение."
+                      + " Попробуйте ещё раз.\"}";
+              for (String recipient : task.complete(busy)) append(recipient, busy, task.token);
+            }
+          } else {
+            String previous = tasks.result(id);
+            if (previous != null)
+              append(id, previous, tasks.token(id).cancelled() ? cancellation : tasks.token(id));
+          }
         }
       } else if (type.equals("turn.done")) {
         recordTurn(event.optJSONObject("turn"), event.optString("event_id"));
       } else if (type.equals("error")) listener.fatal("Голосовой сервер сообщил об ошибке");
       else if (type.equals("session.closed")) listener.fatal("Голосовой сеанс завершён сервером");
-    } catch (Exception ignored) {
+    } catch (Exception failure) {
+      android.util.Log.w(
+          "TVGPTLive", "Event handling failed: " + failure.getClass().getSimpleName());
+      if (!closed) listener.status("Не удалось обработать поручение");
     }
   }
 
@@ -269,56 +301,17 @@ final class LiveConnection {
     }
   }
 
-  private synchronized void scheduleSpeechStop(long now) {
-    if (pendingStop != null) {
-      pendingStop.cancel(false);
-      pendingStop = null;
-    }
-    long delay = speechStop.delay(now);
-    if (delay >= 0 && !closed && !ending.get())
-      pendingStop =
-          stopTimer.schedule(
-              () -> {
-                if (speechStop.due(android.os.SystemClock.uptimeMillis()))
-                  requestLocalEnd("stable_partial_goodbye");
-              },
-              delay,
-              TimeUnit.MILLISECONDS);
-  }
-
   private void requestLocalEnd(String reason) {
     if (closed || !ending.compareAndSet(false, true)) return;
-    android.util.Log.i(
-        "TVGPTSession", "Local close requested; reason=" + reason + "; no agent round");
-    agent.cancel();
+    android.util.Log.i("TVGPTSession", "Local close requested; reason=" + reason);
+    tasks.close();
     listener.endRequested();
-  }
-
-  private void mediaCommand(String id, String action) {
-    if (closed || ending.get()) return;
-    try {
-      String result =
-          new TvTools(context).execute("media_control", new JSONObject().put("action", action));
-      if (id != null) append(id, result);
-    } catch (Exception error) {
-      android.util.Log.w(
-          "TVGPTControl", "Media command failed: " + error.getClass().getSimpleName());
-    }
   }
 
   private void recordTurn(JSONObject turn, String rootEventId) {
     if (turn != null) {
       String role = turn.optString("role"), transcript = turn.optString("transcript");
       listener.transcript(role, transcript);
-      if (role.equals("user")) {
-        String action = LiveProtocol.localMediaAction(transcript);
-        long now = android.os.SystemClock.uptimeMillis();
-        if (action != null && (!action.equals(lastMedia) || now - lastMediaAt > 1000)) {
-          lastMedia = action;
-          lastMediaAt = now;
-          controls.execute(() -> mediaCommand(null, action));
-        }
-      }
       heard = "";
       spoken = "";
       if ((role.equals("user") || role.equals("assistant")) && !transcript.isEmpty())
@@ -358,43 +351,92 @@ final class LiveConnection {
     }
   }
 
-  private void delegate(String id, String text) {
+  private void delegate(TaskHarness.Task task) {
     if (closed) return;
+    if (task.token.cancelled()) {
+      cancelledResult(task);
+      return;
+    }
     listener.status("Выполняю поручение…");
     try {
-      append(id, agent.run(text));
-      if (!closed) listener.status("Слушаю");
-    } catch (Exception e) {
-      android.util.Log.w("TVGPTLive", "Agent failed: " + DeviceLogin.safeError(e));
+      SessionStore.State isolated = new SessionStore.State();
+      isolated.id = workspace.id;
+      isolated.created = workspace.created;
+      isolated.history = new JSONArray(task.context.toString());
+      isolated.transcript = new JSONArray();
+      Agent worker =
+          new Agent(context, isolated, () -> requestLocalEnd("agent_end_tool"), tasks, task);
+      String result = worker.outcome(worker.run(task.text));
+      if (!closed && !task.token.cancelled()) {
+        for (String recipient : task.complete(result)) append(recipient, result, task.token);
+        synchronized (task) {
+          if (!task.token.cancelled()) task.status = "delivered";
+        }
+        listener.status("Слушаю");
+      }
+    } catch (CancellationException stopped) {
+      task.cancel();
+    } catch (Exception failure) {
+      if (task.token.cancelled()) return;
+      if (task.result != null) {
+        task.status = "delivery_failed";
+        android.util.Log.w("TVGPTLive", "Task result delivery failed; no mutation replay");
+        if (!closed) listener.fatal("Не удалось передать результат");
+        return;
+      }
+      android.util.Log.w(
+          "TVGPTLive", "Task result unconfirmed: " + failure.getClass().getSimpleName());
       try {
-        append(id, "Не удалось выполнить поручение. " + DeviceLogin.safeError(e));
-        listener.status("Не удалось выполнить поручение");
-      } catch (Exception ignored) {
+        if (!closed && !task.token.cancelled()) {
+          String outcome =
+              "{\"status\":\"unconfirmed\",\"speech\":\"Не удалось подтвердить результат"
+                  + " поручения.\"}";
+          for (String recipient : task.complete(outcome)) append(recipient, outcome, task.token);
+        }
+      } catch (Exception delivery) {
+        task.status = "delivery_failed";
+        android.util.Log.w("TVGPTLive", "Task result delivery failed");
+        if (!closed) listener.fatal("Не удалось передать результат");
+      }
+    } finally {
+      if (task.token.cancelled()) cancelledResult(task);
+    }
+  }
+
+  private void cancelledResult(TaskHarness.Task task) {
+    if (closed) return;
+    for (String recipient : task.claimPending()) {
+      try {
+        append(recipient, task.result, cancellation);
+      } catch (Exception delivery) {
+        android.util.Log.w("TVGPTLive", "Cancelled result delivery failed");
       }
     }
   }
 
   private void append(String id, String text) throws Exception {
+    append(id, text, cancellation);
+  }
+
+  private void append(String id, String text, CancellationToken token) throws Exception {
     if (closed) return;
-    for (String part : LiveProtocol.chunks(text)) {
-      JSONObject message =
-          new JSONObject()
-              .put("type", "delegation.context.append")
-              .put("delegation_item_id", id)
-              .put("channel", "speakable")
-              .put(
-                  "content",
-                  new JSONArray()
-                      .put(new JSONObject().put("type", "input_text").put("text", part)));
-      if (socket != null) socket.send(message.toString());
-    }
+    token.check();
+    LiveDelivery.send(
+        text,
+        token,
+        part -> {
+          JSONObject message =
+              LiveProtocol.delegationResult(id, part, callContext.isCurrent(tasks.inputId(id)));
+          return socket != null && socket.send(message.toString());
+        });
   }
 
   void userText(String text) {
     try {
       for (String part : LiveProtocol.chunks(text)) {
         JSONObject message = LiveProtocol.userInput(part);
-        if (!closed && socket != null) socket.send(message.toString());
+        if (!closed && (socket == null || !socket.send(message.toString())))
+          throw new java.io.IOException("Voice input delivery unavailable");
       }
     } catch (Exception e) {
       if (!closed) listener.fatal("Не удалось передать текст в разговор");
@@ -404,13 +446,14 @@ final class LiveConnection {
   void close() {
     if (closed) return;
     closed = true;
-    agent.cancel();
+    if (diagnosticOwner == this) diagnosticOwner = null;
+    cancellation.cancel();
+    tasks.close();
+    taskWorkers.shutdownNow();
     if (socket != null) {
       socket.send("{\"type\":\"session.close\"}");
       socket.close(1000, "closed");
     }
-    stopTimer.shutdownNow();
-    controls.shutdownNow();
     executor.shutdownNow();
     client.dispatcher().cancelAll();
     client.connectionPool().evictAll();

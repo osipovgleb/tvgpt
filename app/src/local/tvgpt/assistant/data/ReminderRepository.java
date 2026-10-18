@@ -4,6 +4,7 @@ import android.content.*;
 import android.database.*;
 import android.database.sqlite.*;
 import java.time.*;
+import local.tvgpt.assistant.CancellationToken;
 import local.tvgpt.assistant.reminders.SchedulePolicy;
 import org.json.*;
 
@@ -24,6 +25,22 @@ public final class ReminderRepository {
       long elapsed,
       String boot,
       String action) {
+    return create(
+        body, due, zone, kind, repeat, days, elapsed, boot, action, CancellationToken.NONE);
+  }
+
+  public long create(
+      String body,
+      long due,
+      String zone,
+      String kind,
+      String repeat,
+      int days,
+      long elapsed,
+      String boot,
+      String action,
+      CancellationToken token) {
+    token.check();
     if (body == null || body.trim().isEmpty() || body.length() > 1000)
       throw new IllegalArgumentException("Текст: от 1 до 1000 символов");
     ZoneId.of(zone);
@@ -47,7 +64,16 @@ public final class ReminderRepository {
     v.put("elapsed_due", elapsed);
     v.put("boot", boot);
     v.put("action", action);
-    return db.insertOrThrow("reminders", null, v);
+    db.beginTransaction();
+    try {
+      token.check();
+      long id = db.insertOrThrow("reminders", null, v);
+      token.check();
+      db.setTransactionSuccessful();
+      return id;
+    } finally {
+      db.endTransaction();
+    }
   }
 
   public JSONArray list() {
@@ -68,13 +94,22 @@ public final class ReminderRepository {
   }
 
   public boolean claim(long id) {
+    try (Cursor c =
+        db.rawQuery("SELECT revision FROM reminders WHERE id=?", new String[] {"" + id})) {
+      return c.moveToFirst() && claim(id, c.getLong(0));
+    }
+  }
+
+  /** Claim only the exact snapshot selected for this delivery batch. */
+  public boolean claim(long id, long expectedRevision) {
     ContentValues v = new ContentValues();
     v.put("status", "delivering");
     return db.update(
             "reminders",
             v,
-            "id=? AND enabled=1 AND status IN ('pending','scheduled') AND due<=?",
-            new String[] {"" + id, "" + System.currentTimeMillis()})
+            "id=? AND enabled=1 AND status IN ('pending','scheduled') AND due<=?"
+                + " AND revision=?",
+            new String[] {"" + id, "" + System.currentTimeMillis(), "" + expectedRevision})
         == 1;
   }
 
@@ -83,8 +118,8 @@ public final class ReminderRepository {
   }
 
   public void finish(JSONObject item, String outcome) {
-    if (!outcome.equals("completed") && !outcome.equals("failed") && !outcome.equals("unconfirmed"))
-      throw new IllegalArgumentException("outcome");
+    if (!java.util.Arrays.asList("completed", "failed", "unconfirmed", "notified")
+        .contains(outcome)) throw new IllegalArgumentException("outcome");
     long id = item.optLong("id");
     String repeat = item.optString("repeat");
     db.execSQL(
@@ -111,6 +146,19 @@ public final class ReminderRepository {
 
   public void edit(
       long id, long revision, String body, long due, String zone, String repeat, int days) {
+    edit(id, revision, body, due, zone, repeat, days, CancellationToken.NONE);
+  }
+
+  public void edit(
+      long id,
+      long revision,
+      String body,
+      long due,
+      String zone,
+      String repeat,
+      int days,
+      CancellationToken token) {
+    token.check();
     if (body == null
         || body.trim().isEmpty()
         || body.length() > 1000
@@ -127,43 +175,127 @@ public final class ReminderRepository {
     v.put("weekdays", days);
     v.put("status", "scheduled");
     v.put("enabled", 1);
-    try (Cursor current =
-        db.rawQuery(
-            "SELECT kind FROM reminders WHERE id=? AND revision=?",
-            new String[] {"" + id, "" + revision})) {
-      if (!current.moveToFirst())
-        throw new IllegalStateException("Напоминание уже изменено. Откройте список снова.");
-      String kind = current.getString(0);
-      v.put("kind", kind.equals("TIMER") ? "REMINDER" : kind);
+    db.beginTransaction();
+    try {
+      token.check();
+      try (Cursor current =
+          db.rawQuery(
+              "SELECT kind FROM reminders WHERE id=? AND revision=?",
+              new String[] {"" + id, "" + revision})) {
+        if (!current.moveToFirst())
+          throw new IllegalStateException("Напоминание уже изменено. Откройте список снова.");
+        String kind = current.getString(0);
+        v.put("kind", kind.equals("TIMER") ? "REMINDER" : kind);
+      }
+      v.put("elapsed_due", 0);
+      v.put("revision", revision + 1);
+      token.check();
+      if (db.update(
+              "reminders",
+              v,
+              "id=? AND revision=? AND status!='delivering'",
+              new String[] {"" + id, "" + revision})
+          != 1) throw new IllegalStateException("Напоминание уже изменено. Откройте список снова.");
+      token.check();
+      db.setTransactionSuccessful();
+    } finally {
+      db.endTransaction();
     }
-    v.put("elapsed_due", 0);
-    v.put("revision", revision + 1);
-    if (db.update(
-            "reminders",
-            v,
-            "id=? AND revision=? AND status!='delivering'",
-            new String[] {"" + id, "" + revision})
-        != 1) throw new IllegalStateException("Напоминание уже изменено. Откройте список снова.");
   }
 
   public boolean cancel(long id) {
-    try (android.database.sqlite.SQLiteStatement statement =
-        db.compileStatement(
-            "UPDATE reminders SET enabled=0,status='cancelled',revision=revision+1 WHERE id=? AND"
-                + " enabled=1")) {
-      statement.bindLong(1, id);
-      return statement.executeUpdateDelete() == 1;
+    return cancel(id, CancellationToken.NONE);
+  }
+
+  public boolean cancel(long id, CancellationToken token) {
+    token.check();
+    db.beginTransaction();
+    try {
+      token.check();
+      try (SQLiteStatement statement =
+          db.compileStatement(
+              "UPDATE reminders SET enabled=0,status='cancelled',revision=revision+1 WHERE id=? AND"
+                  + " enabled=1 AND status IN ('scheduled','pending')")) {
+        statement.bindLong(1, id);
+        token.check();
+        boolean cancelled = statement.executeUpdateDelete() == 1;
+        token.check();
+        db.setTransactionSuccessful();
+        return cancelled;
+      }
+    } finally {
+      db.endTransaction();
     }
   }
 
   public void delete(long id) {
-    db.delete("reminders", "id=?", new String[] {"" + id});
+    delete(id, CancellationToken.NONE);
+  }
+
+  public void delete(long id, CancellationToken token) {
+    token.check();
+    db.beginTransaction();
+    try {
+      token.check();
+      try (Cursor c =
+          db.rawQuery("SELECT status FROM reminders WHERE id=?", new String[] {"" + id})) {
+        if (c.moveToFirst() && c.getString(0).equals("delivering"))
+          throw new IllegalStateException("Напоминание уже выполняется. Дождитесь результата.");
+      }
+      token.check();
+      db.delete("reminders", "id=?", new String[] {"" + id});
+      token.check();
+      db.setTransactionSuccessful();
+    } finally {
+      db.endTransaction();
+    }
   }
 
   public void recoverInterrupted() {
+    db.beginTransaction();
+    try {
+      JSONArray abandoned = query("SELECT * FROM reminders WHERE status='delivering'", null);
+      for (int i = 0; i < abandoned.length(); i++)
+        finish(abandoned.optJSONObject(i), "unconfirmed");
+      db.setTransactionSuccessful();
+    } finally {
+      db.endTransaction();
+    }
+  }
+
+  /** Claim is the durable dispatch boundary: later cancellation cannot promise prevention. */
+  public String cancelOutcome(long id) {
+    return cancelOutcome(id, CancellationToken.NONE);
+  }
+
+  public String cancelOutcome(long id, CancellationToken token) {
+    if (cancel(id, token)) return "cancelled";
+    try (Cursor c =
+        db.rawQuery("SELECT status FROM reminders WHERE id=?", new String[] {"" + id})) {
+      token.check();
+      return c.moveToFirst() && c.getString(0).equals("delivering")
+          ? "already_dispatching_unconfirmed"
+          : "not_active";
+    }
+  }
+
+  public void rebaseTimers(long now, long elapsed, String boot) {
     db.execSQL(
-        "UPDATE reminders SET status='failed',enabled=0,revision=revision+1 WHERE"
-            + " status='delivering'");
+        "UPDATE reminders SET due=?+MAX(0,elapsed_due-?) WHERE enabled=1"
+            + " AND status='scheduled' AND kind='TIMER' AND boot=?",
+        new Object[] {now, elapsed, boot});
+  }
+
+  /** SQL aggregate avoids the presentation list's 200-row cap. Pending work waits for screen-on. */
+  public long nextDue(boolean interactive) {
+    try (Cursor c =
+        db.rawQuery(
+            "SELECT MIN(due) FROM reminders WHERE enabled=1 AND "
+                + (interactive ? "status IN ('scheduled','pending')" : "status='scheduled'"),
+            null)) {
+      if (!c.moveToFirst() || c.getString(0) == null) return Long.MAX_VALUE;
+      return c.getLong(0);
+    }
   }
 
   public void timerDue(long id, long due) {

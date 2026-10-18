@@ -13,12 +13,19 @@ final class ReminderTools {
   }
 
   static Object execute(Context c, String name, JSONObject a) throws Exception {
+    return execute(c, name, a, CancellationToken.NONE);
+  }
+
+  static Object execute(Context c, String name, JSONObject a, CancellationToken token)
+      throws Exception {
+    token.check();
     ReminderRepository repo = new ReminderRepository(c);
+    token.check();
     if (name.equals("reminder_list")) return repo.list().toString();
     if (name.equals("reminder_cancel")) {
-      boolean cancelled = repo.cancel(a.getLong("id"));
+      String outcome = repo.cancelOutcome(a.getLong("id"), token);
       AlarmScheduler.reconcile(c);
-      return new JSONObject().put("cancelled", cancelled);
+      return new JSONObject().put("cancelled", outcome.equals("cancelled")).put("outcome", outcome);
     }
     String body = a.getString("body");
     String zone = new local.tvgpt.assistant.settings.GeneralPreferences(c).zone().getId();
@@ -42,7 +49,8 @@ final class ReminderTools {
       }
     }
     long id =
-        repo.create(body, due, zone, kind, repeat, days, elapsed, AlarmScheduler.boot(c), action);
+        repo.create(
+            body, due, zone, kind, repeat, days, elapsed, AlarmScheduler.boot(c), action, token);
     AlarmScheduler.reconcile(c);
     return new JSONObject()
         .put("id", id)

@@ -17,12 +17,12 @@ PY
 fi
 "$TVGPT_JAVA/javac" -cp build/deps/json-test.jar -d build/test app/src/local/tvgpt/assistant/LiveStartupTrace.java tests/LiveStartupTraceTest.java
 "$TVGPT_JAVA/java" -cp build/test:build/deps/json-test.jar local.tvgpt.assistant.LiveStartupTraceTest
-"$TVGPT_JAVA/javac" -cp build/deps/json-test.jar -d build/test app/src/local/tvgpt/assistant/{Protocol,LiveProtocol,WakePhrase,AdbWire,EndPhrase,SessionStore,AssistantSetup,AssistantInvocation,SpeechStop,DirectInputRequest,AppSearchPolicy,AppNavigation}.java tests/{ProtocolTest,LiveProtocolTest,WakePhraseTest,AdbWireTest,ConversationPolicyTest,SessionStoreTest,AssistantSetupTest,AssistantInvocationTest,SpeechStopTest,DirectInputRequestTest,AppSearchPolicyTest,AppNavigationTest}.java
-for test in ProtocolTest LiveProtocolTest WakePhraseTest AdbWireTest ConversationPolicyTest SessionStoreTest AssistantSetupTest AssistantInvocationTest SpeechStopTest DirectInputRequestTest AppSearchPolicyTest AppNavigationTest; do
+"$TVGPT_JAVA/javac" -cp build/deps/json-test.jar -d build/test app/src/local/tvgpt/assistant/{Protocol,LiveProtocol,WakePhrase,AdbWire,SessionStore,AssistantSetup,AssistantInvocation,DirectInputRequest,AppSearchPolicy,AppNavigation}.java tests/{ProtocolTest,LiveProtocolTest,WakePhraseTest,AdbWireTest,ConversationPolicyTest,SessionStoreTest,AssistantSetupTest,AssistantInvocationTest,DirectInputRequestTest,AppSearchPolicyTest,AppNavigationTest}.java
+for test in ProtocolTest LiveProtocolTest WakePhraseTest AdbWireTest ConversationPolicyTest SessionStoreTest AssistantSetupTest AssistantInvocationTest DirectInputRequestTest AppSearchPolicyTest AppNavigationTest; do
  "$TVGPT_JAVA/java" -cp build/test:build/deps/json-test.jar "local.tvgpt.assistant.$test"
 done
 
-"$TVGPT_JAVA/javac" -cp build/deps/json-test.jar -d build/test app/src/local/tvgpt/assistant/{ActionWait,ActionObservation,AudioFocusLease,PlaybackObservation,MediaSessionControl,RemoteSequence}.java tests/{ActionWaitTest,ActionObservationTest,AudioFocusLeaseTest,PlaybackObservationTest,MediaSessionControlTest,RemoteSequenceTest}.java
+"$TVGPT_JAVA/javac" -cp build/deps/json-test.jar -d build/test app/src/local/tvgpt/assistant/{CancellationToken,ActionWait,ActionObservation,AudioFocusLease,PlaybackObservation,MediaSessionControl,RemoteSequence}.java tests/{ActionWaitTest,ActionObservationTest,AudioFocusLeaseTest,PlaybackObservationTest,MediaSessionControlTest,RemoteSequenceTest}.java
 "$TVGPT_JAVA/java" -cp build/test:build/deps/json-test.jar local.tvgpt.assistant.ActionWaitTest
 "$TVGPT_JAVA/java" -cp build/test:build/deps/json-test.jar local.tvgpt.assistant.ActionObservationTest
 
@@ -37,8 +37,9 @@ done
 "$TVGPT_JAVA/java" -cp build/test local.tvgpt.assistant.AppSkillIndexTest
 
 mkdir -p build/agent-test
-"$TVGPT_JAVA/javac" -cp build/deps/json-test.jar -d build/agent-test tests/agent-stubs/android/content/Context.java tests/agent-stubs/android/util/Log.java tests/agent-stubs/AgentFakes.java tests/agent-stubs/local/tvgpt/assistant/data/{KnowledgeRepository,ConversationRepository}.java app/src/local/tvgpt/assistant/{Agent,AgentTools,CodexRouting,ConversationTools,WebSources,LiveProtocol,EndPhrase,SessionStore}.java tests/{AgentLoopTest,SessionConcurrencyTest,AgentConversationTest,ConversationToolsTest}.java
+"$TVGPT_JAVA/javac" -cp build/deps/json-test.jar -d build/agent-test tests/agent-stubs/android/content/Context.java tests/agent-stubs/android/util/Log.java tests/agent-stubs/AgentFakes.java tests/agent-stubs/local/tvgpt/assistant/data/{KnowledgeRepository,ConversationRepository}.java app/src/local/tvgpt/assistant/{CancellationToken,TaskHarness,TaskEvidence,Agent,AgentTools,CodexRouting,ConversationTools,WebSources,LiveProtocol,SessionStore}.java tests/{AgentLoopTest,AgentHarnessTest,SessionConcurrencyTest,AgentConversationTest,ConversationToolsTest}.java
 "$TVGPT_JAVA/java" -cp build/agent-test:build/deps/json-test.jar local.tvgpt.assistant.AgentLoopTest
+"$TVGPT_JAVA/java" -cp build/agent-test:build/deps/json-test.jar local.tvgpt.assistant.AgentHarnessTest
 "$TVGPT_JAVA/java" -cp build/agent-test:build/deps/json-test.jar local.tvgpt.assistant.SessionConcurrencyTest
 "$TVGPT_JAVA/java" -cp build/agent-test:build/deps/json-test.jar local.tvgpt.assistant.AgentConversationTest
 "$TVGPT_JAVA/java" -cp build/agent-test:build/deps/json-test.jar local.tvgpt.assistant.ConversationToolsTest
@@ -70,6 +71,44 @@ mkdir -p build/preview-test
 "$TVGPT_JAVA/javac" -cp build/deps/json-test.jar -d build/feature-test app/src/local/tvgpt/assistant/settings/ModelOptions.java tests/ModelOptionsTest.java
 "$TVGPT_JAVA/java" -cp build/feature-test:build/deps/json-test.jar local.tvgpt.assistant.ModelOptionsTest
 
+"$TVGPT_JAVA/javac" -cp build/deps/json-test.jar -d build/test app/src/local/tvgpt/assistant/digests/ImageGenerationProtocol.java tests/ImageGenerationProtocolTest.java
+"$TVGPT_JAVA/java" -cp build/test:build/deps/json-test.jar local.tvgpt.assistant.digests.ImageGenerationProtocolTest
+"$TVGPT_JAVA/javac" -cp build/test:build/deps/json-test.jar -d build/test app/src/local/tvgpt/assistant/digests/SubscriptionImageProtocol.java tests/SubscriptionImageProtocolTest.java
+"$TVGPT_JAVA/java" -cp build/test:build/deps/json-test.jar local.tvgpt.assistant.digests.SubscriptionImageProtocolTest
+"$TVGPT_JAVA/javac" -cp build/deps/okhttp.jar:build/deps/okio.jar -d build/test app/src/local/tvgpt/assistant/digests/SubscriptionImageTransport.java tests/SubscriptionImageTransportTest.java
+"$TVGPT_JAVA/java" -cp build/test:build/deps/okhttp.jar:build/deps/okio.jar local.tvgpt.assistant.digests.SubscriptionImageTransportTest
+"$TVGPT_JAVA/javac" -cp build/deps/json-test.jar -d build/test app/src/local/tvgpt/assistant/digests/DigestPolicy.java tests/DigestPolicyTest.java
+"$TVGPT_JAVA/java" -cp build/test:build/deps/json-test.jar local.tvgpt.assistant.digests.DigestPolicyTest
+"$TVGPT_JAVA/javac" -cp build/deps/json-test.jar -d build/test app/src/local/tvgpt/assistant/digests/{DigestSchedulePolicy,DigestSlides}.java tests/{DigestSchedulePolicyTest,DigestSlidesTest}.java
+"$TVGPT_JAVA/java" -cp build/test:build/deps/json-test.jar local.tvgpt.assistant.digests.DigestSchedulePolicyTest
+"$TVGPT_JAVA/java" -cp build/test:build/deps/json-test.jar local.tvgpt.assistant.digests.DigestSlidesTest
+"$TVGPT_JAVA/javac" -cp build/deps/json-test.jar -d build/test app/src/local/tvgpt/assistant/digests/NewsPolicy.java tests/NewsPolicyTest.java
+"$TVGPT_JAVA/java" -cp build/test:build/deps/json-test.jar local.tvgpt.assistant.digests.NewsPolicyTest
+"$TVGPT_JAVA/javac" -cp build/test:build/deps/json-test.jar -d build/test app/src/local/tvgpt/assistant/digests/DigestRunPolicy.java tests/DigestRunPolicyTest.java
+"$TVGPT_JAVA/java" -cp build/test:build/deps/json-test.jar local.tvgpt.assistant.digests.DigestRunPolicyTest
+"$TVGPT_JAVA/javac" -cp build/deps/json-test.jar -d build/test app/src/local/tvgpt/assistant/digests/{DigestPolicy,DigestToolContract}.java tests/DigestToolsTest.java
+"$TVGPT_JAVA/java" -cp build/test:build/deps/json-test.jar local.tvgpt.assistant.digests.DigestToolsTest
+"$TVGPT_JAVA/javac" -cp build/deps/json-test.jar:build/deps/okhttp.jar:build/deps/okio.jar -d build/test app/src/local/tvgpt/assistant/digests/{NewsPolicy,NewsSourceClient,DigestResearchProtocol}.java tests/DigestResearchTest.java
+"$TVGPT_JAVA/java" -cp build/test:build/deps/json-test.jar:build/deps/okhttp.jar:build/deps/okio.jar local.tvgpt.assistant.digests.DigestResearchTest
+mkdir -p build/digest-db-test
+"$TVGPT_JAVA/javac" -cp build/deps/json-test.jar:build/deps/okhttp.jar:build/deps/okio.jar -d build/digest-db-test $(find tests/digest-stubs -name '*.java') app/src/local/tvgpt/assistant/CancellationToken.java app/src/local/tvgpt/assistant/data/{AppDatabase,DigestSchema,DigestConfiguration,DigestArchive,DigestRepository}.java app/src/local/tvgpt/assistant/digests/{DigestPolicy,DigestSchedulePolicy,DigestSlides,DigestImages,DigestRunPolicy,NewsPolicy,NewsSourceClient}.java tests/DigestRepositoryTest.java
+"$TVGPT_JAVA/java" -cp build/digest-db-test:build/deps/json-test.jar:build/deps/okhttp.jar:build/deps/okio.jar local.tvgpt.assistant.digests.DigestRepositoryTest
+"$TVGPT_JAVA/javac" -d build/test app/src/local/tvgpt/assistant/digests/DigestJobHandoff.java tests/DigestJobHandoffTest.java
+"$TVGPT_JAVA/java" -cp build/test local.tvgpt.assistant.digests.DigestJobHandoffTest
+
 "$TVGPT_JAVA/java" -cp build/test:build/deps/json-test.jar local.tvgpt.assistant.RemoteSequenceTest
 
 python3 tests/test_prepare_assets.py
+
+"$TVGPT_JAVA/javac" -cp build/deps/json-test.jar -d build/test app/src/local/tvgpt/assistant/{CancellationToken,CallContext,TaskHarness,TaskEvidence,LiveProtocol,LiveDelivery,Http,RefreshFlight,WakeRecovery,VoicePreflight}.java app/src/local/tvgpt/assistant/voice/ClosingWork.java tests/{CancellationTokenTest,CallContextTest,TaskHarnessTest,TaskEvidenceTest,LiveDeliveryTest,HttpCancellationTest,AuthVoiceLifecycleTest,VoiceQueuePreflightTest}.java
+for test in CancellationTokenTest CallContextTest TaskHarnessTest TaskEvidenceTest LiveDeliveryTest HttpCancellationTest AuthVoiceLifecycleTest VoiceQueuePreflightTest; do
+ "$TVGPT_JAVA/java" -cp build/test:build/deps/json-test.jar "local.tvgpt.assistant.$test"
+done
+bash scripts/test-data-repair.sh
+bash scripts/test-tv-actions.sh
+"$TVGPT_JAVA/javac" -cp "$TVGPT_TOOLCHAIN/android-35/android.jar:build/deps/json-test.jar" -d build/wake-test $(find tests/wake-stubs -name '*.java') app/src/local/tvgpt/assistant/{WakeDetector,WakeRecovery,WakePhrase}.java tests/WakeDetectorRecoveryTest.java
+"$TVGPT_JAVA/java" -cp "build/wake-test:$TVGPT_TOOLCHAIN/android-35/android.jar:build/deps/json-test.jar" local.tvgpt.assistant.WakeDetectorRecoveryTest
+
+bash scripts/test-digest-cancellation.sh
+
+bash scripts/test-session-lifecycle.sh

@@ -37,15 +37,8 @@ Host tests and ARM32 builds pass, including date arithmetic, model catalog filte
 
 Concurrent main-thread builds have also updated the same TV. A test must verify lastUpdateTime/current UI before attributing results to a side-branch build; an installed APK is not stable evidence if another build replaced it during the test. Main working changes are left untouched.
 
+## Дайджесты — ветка codex/news-digests
 
-## Bundled voice previews integrated into main checkout — 18 October 2026
+Реализованы локально новый раздел, источники RSS/Atom/web, фоновые расписания и типизированные голосовые команды; приложение само выполняет поиск и опциональную генерацию. Сначала публикуются тексты и фотографии исходных сайтов, затем при доступности — генерируемые иллюстрации. Imagegen не блокирует дайджесты.
 
-The nine official Russian M4A previews and MediaPlayer adapter from `7a3eae7` existed only in the app-sections worktree. The main checkout and installed APK still used unsuccessful Live sample preparation. A device regression check reproduced the actual packaging defect: `FileNotFoundException: voice-samples/cove.m4a`. The assets and playback implementation are now integrated into the main checkout without replacing its concurrent changes. Sources, source-ID mappings and SHA-256 are retained in `app/assets/voice-samples/sources.json`.
-
-The ARM32 APK was built and installed with `adb install -r` at08:08:47 Moscow time. SHA-256: `3b5ef030552ef9f15263e69a24250e0824c73e85c92f0169c974ae5cfa3f1272` (`build/tvgpt-bundled-voices.apk`). Every M4A in that APK matches its recorded source hash and is stored uncompressed for direct asset playback. The full host suite and app/test builds passed. AI Slop:92/100,0 errors,7 warnings: five intentional canonical subscription URLs and two existing method-length findings in concurrent work.
-
-The device `bundled-voices` instrumentation test opened the actual APK assets with MediaMetadataRetriever and played all nine through VoiceSamples/MediaPlayer to successful completion: Cove13167ms, Juniper9309ms, Maple6424ms, Spruce9821ms, Ember9063ms, Vale8910ms, Breeze10355ms, Arbor7770ms, Sol7901ms. Android audio logs show MediaPlayer started on output device2. The user explicitly confirmed hearing the samples from the TV. This verifies previews, not Live voice entitlement.
-
-Remote input also exercised the actual Assistant settings voice row: entering the row started Cove; Right changed the displayed value and started Juniper; Left restored Cove and played it. After leaving the screen there was no TV GPT MediaPlayer in the active player list. A concurrent update at08:11:27 replaced the installed APK during subsequent navigation; the replacement APK was pulled read-only and independently verified to contain all nine matching M4A assets and the bundled playback code. Later navigation interrupted by that replacement is not counted as another successful UI test.
-
-Replacement APK SHA-256: `8af50da1e0a497a0fed508339e9a827a072512201c927cf8e61e9870240973f3`.
+Ручной полноэкранный просмотр и DreamService добавлены. Установка этой ветки, D-pad на TCL, реальный интернет/imagegen, фоновое выполнение в standby и автоматическая замена системной заставки пока не проверены на устройстве. SQLite assertions подготовлены для отдельного self-targeted тестового APK.

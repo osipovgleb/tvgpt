@@ -191,3 +191,16 @@ On-device close-ui replay of that exact final user transcript logged final_user_
 Host suite and ARM32/test APK builds passed. Quality95/100,0errors,5 intentional canonical subscription URL warnings. Streamed update preserved UID10161 and the logged-in account; original private startup OGG in the installed build matches its external source hash.
 
 Follow-up normal call (no injected events/check prompt):09:28:44.044 stable_partial_goodbye requested local close, microphone muted09:28:44.071, media released399ms later, system hide09:28:44.973. Native input/output transcript events occurred in this call. This confirms the ordinary closing path; the explicit human heard-answer/speed response to the pending prompt has not yet arrived.
+
+
+###18 October: authorized news-digests installation
+
+User explicitly requested «установи». Installed b61c9d9 using streamed `install --no-incremental -r`, without uninstall or clear-data. Package remained present with UID10161. connect-tv.py restored and verified actual AssistantService/TvAccessibility bindings; assistant and voice_interaction_service both point to AssistantService. Katniss remained disabled. Settings screenshot showed ChatGPT account «Подключён»; native Digests section opened with Create collection and Choose screensaver controls. This confirms installation/account/basic navigation only, not news collection, imagegen, D-pad editing or DreamService auto-start.
+
+###18 October: OEM startup denial after process termination
+
+Read-only exit-info and ActivityManager logs identify SIGKILL by TCL Guard at14:09:44 (PID14281, PSS246MB/RSS315MB), followed by OEM denial of assistant/accessibility restarts and later assistant-button SessionService bind denial. Both OEM APP_AUTO_START and APP_ASSOC_START were ignore. Set those two operations to allow for the assistant package only; verified readback and wrote appops settings. Rebinding restored PID23992. No root, package data removal, Guard disable or global power-policy change was used. Long-term/reboot verification remains pending.
+
+Final recovery verification: allowing startup restored actual service restarts after a crash, but a further TGuard kill required the package-specific runtime mKillWhiteList exception. The current Guard dump confirms TV GPT membership; it is reapplied once on assistant process startup when paired ADB is available. A rebind-related BadTokenException was reproduced in host lifecycle tests and routed to the existing native system window. On the updated device, the first immediate invocation closed before connection (unexplained); the next reached session.started in2.9s, with the same process alive. No repeated natural-speech closing or reboot persistence claim is made.
+
+Recovery release artifacts (same runtime bytecode/manifest): personal APK SHA2562728b112bf3fa5e5b0acfacb602021135668404aa196d444458170662075c232; public ARMv7 APK SHA256c04b63136966d7ad03cbe568cc06107d5a0348f553640f4b701190459458ea01. Public APK contains no OGG/M4A; personal APK retains the exact external original cue. Installed package remains UID10161/versionCode2. Host suite, formatter and native ARM32 build passed; quality0 errors, existing style/canonical subscription URL warnings retained.

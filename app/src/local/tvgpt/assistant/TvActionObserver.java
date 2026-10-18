@@ -9,20 +9,30 @@ import org.json.JSONObject;
 /** Runs commands off-main and returns a fresh observation with an explicit confirmation scope. */
 final class TvActionObserver {
   private final Context context;
+  private final CancellationToken token;
   private final Handler main = new Handler(Looper.getMainLooper());
 
   TvActionObserver(Context context) {
+    this(context, CancellationToken.NONE);
+  }
+
+  TvActionObserver(Context context, CancellationToken token) {
     this.context = context;
+    this.token = token;
   }
 
   String execute(String name, JSONObject args, Callable<String> action) throws Exception {
+    token.check();
     if (name.equals("wait_for_screen")) return waitForScreen(args);
     if (!mutates(name)) return action.call();
     if (Looper.myLooper() == Looper.getMainLooper())
       throw new IllegalStateException("Actions with observation require a worker thread");
     JSONObject before = snapshot();
     int expectedVolume = expectedVolume(name, args);
+    String target = targetPackage(name, args);
+    token.check();
     String receipt = action.call();
+    token.check();
     if (receipt.equals("Приложение не найдено")
         || receipt.startsWith("У приложения нет")
         || receipt.startsWith("Не ")
@@ -32,7 +42,9 @@ final class TvActionObserver {
         || receipt.startsWith("Доступный элемент не найден"))
       return ActionObservation.result(receipt, snapshot(), "").put("status", "rejected").toString();
     try {
-      return observe(name, args, receipt, before, expectedVolume);
+      return observe(name, args, receipt, before, expectedVolume, target);
+    } catch (CancellationException cancelled) {
+      throw cancelled;
     } catch (InterruptedException cancelled) {
       Thread.currentThread().interrupt();
       throw cancelled;
@@ -48,9 +60,13 @@ final class TvActionObserver {
   }
 
   private String observe(
-      String name, JSONObject args, String receipt, JSONObject before, int expectedVolume)
+      String name,
+      JSONObject args,
+      String receipt,
+      JSONObject before,
+      int expectedVolume,
+      String target)
       throws Exception {
-    String target = targetPackage(name, args);
     final JSONObject[] latest = {snapshot()};
     String scope = "";
     long start = ActionWait.MONOTONIC.now();
@@ -183,25 +199,20 @@ final class TvActionObserver {
   }
 
   private JSONObject snapshot() throws Exception {
-    FutureTask<JSONObject> task =
-        new FutureTask<>(
-            () -> {
-              JSONObject state =
-                  TvAccessibility.current == null
-                      ? new JSONObject()
-                      : TvAccessibility.current.observation();
-              AudioManager audio = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
-              return state
-                  .put("volume", audio.getStreamVolume(AudioManager.STREAM_MUSIC))
-                  .put("muted", audio.isStreamMute(AudioManager.STREAM_MUSIC));
-            });
-    main.post(task);
-    try {
-      return task.get(2, TimeUnit.SECONDS);
-    } catch (Exception e) {
-      task.cancel(false);
-      throw e;
-    }
+    return ActionDispatch.onQueue(
+        main::post,
+        () -> {
+          JSONObject state =
+              TvAccessibility.current == null
+                  ? new JSONObject()
+                  : TvAccessibility.current.observation();
+          AudioManager audio = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+          return state
+              .put("volume", audio.getStreamVolume(AudioManager.STREAM_MUSIC))
+              .put("muted", audio.isStreamMute(AudioManager.STREAM_MUSIC));
+        },
+        token,
+        2000);
   }
 
   private static boolean mutates(String name) {

@@ -13,11 +13,13 @@ final class AppSkillIndex {
         || normalized.equals("youtube android tv")
         || normalized.equals("ютуб")
         || normalized.equals("com.google.android.youtube.tv")) return "youtube";
+    if (normalized.equals("imagegen")) return "imagegen";
     return "";
   }
 
   static String asset(String name) {
-    return id(name).equals("youtube") ? "skills/youtube/SKILL.md" : "";
+    String id = id(name);
+    return id.isEmpty() ? "" : "skills/" + id + "/SKILL.md";
   }
 
   static String read(InputStream input) throws IOException {

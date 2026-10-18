@@ -29,6 +29,7 @@ class LiveConnection {
 
 class Http {
   static String lastTier;
+  static String lastInput;
   static Runnable during;
   static int requests;
 
@@ -42,6 +43,7 @@ class Http {
     requests++;
     JSONObject request = new JSONObject(b);
     lastTier = request.optString("service_tier");
+    lastInput = request.getJSONArray("input").getJSONObject(0).getString("content");
     if (request.has("tools")) throw new AssertionError("summary must not expose tools");
     if (during != null) during.run();
     Reply r = new Reply();

@@ -39,6 +39,16 @@ public final class RemoteSequenceTest {
   }
 
   public static void main(String[] args) throws Exception {
+    try {
+      RemoteSequence.execute(
+          new JSONArray().put(step("right", 1)),
+          direction -> {
+            throw new java.util.concurrent.CancellationException();
+          },
+          new Clock());
+      throw new AssertionError("sequence swallowed task cancellation");
+    } catch (java.util.concurrent.CancellationException expected) {
+    }
     List<String> sent = new ArrayList<>();
     Clock clock = new Clock();
     String receipt =

@@ -55,16 +55,38 @@ public class SessionService extends VoiceInteractionSessionService {
           panel = null;
         }
         setUiEnabled(false);
-        TvAccessibility.current.showVoiceOverlay(this, () -> finish());
-        if (args != null && args.getBoolean("voice_check") && VoicePanel.active != null)
-          VoicePanel.active.checkVoice();
-        return;
+        try {
+          TvAccessibility.current.showVoiceOverlay(this, () -> finish());
+          if (args != null && args.getBoolean("voice_check") && VoicePanel.active != null)
+            VoicePanel.active.checkVoice();
+          return;
+        } catch (WindowManager.BadTokenException staleToken) {
+          android.util.Log.i(
+              "TVGPTSession", "Accessibility window token unavailable; using system voice window");
+          TvAccessibility.current.hideVoiceOverlay(this);
+        }
       }
+      showSystemPanel();
+      if (args != null && args.getBoolean("voice_check")) panel.checkVoice();
+    }
+
+    void showSystemPanel() {
       if (panel == null) setContentView(onCreateContentView());
       setUiEnabled(true);
       RemoteFocus.attach(getWindow().getWindow());
       panel.begin();
-      if (args != null && args.getBoolean("voice_check")) panel.checkVoice();
+    }
+
+    @Override
+    public void onCloseSystemDialogs() {
+      // Physical HOME reaches this callback rather than RemoteFocus.begin("home").
+      // Detach ownership before finish() emits onHide/onDestroy, preserving the Live overlay.
+      TvAccessibility access = TvAccessibility.current;
+      if (access != null && access.ownsVoiceOverlay(this)) {
+        access.detachVoiceSessionForHome();
+        return;
+      }
+      super.onCloseSystemDialogs();
     }
 
     @Override

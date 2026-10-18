@@ -8,7 +8,8 @@ node_modules/
 
 .aislop/history.jsonl
 
-# Private audio is supplied from outside the repository during local builds.
+__pycache__/
+
+# Personal audio is supplied outside source control.
 app/assets/voice-start.ogg
 app/assets/voice-samples/*.m4a
-__pycache__/

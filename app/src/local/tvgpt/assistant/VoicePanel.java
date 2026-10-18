@@ -80,7 +80,7 @@ final class VoicePanel extends LinearLayout {
     orb.setContentDescription("Завершаю голосовой разговор");
     orb.state(false, true);
     if (session != null) session.setMuted(true);
-    android.util.Log.i("TVGPTSession", "Closing UI; microphone muted immediately");
+    android.util.Log.i("TVGPTSession", "Closing UI; native microphone mute requested");
     long started = android.os.SystemClock.uptimeMillis();
     releaseMedia(
         () -> {
@@ -93,16 +93,14 @@ final class VoicePanel extends LinearLayout {
   }
 
   void begin() {
-    if (started || closed) return;
-    try {
-      if (new AccountStore(getContext()).load() == null) {
-        status.setText("Сначала войдите в TV GPT");
-        return;
-      }
-    } catch (Exception e) {
-      status.setText("Ошибка сохранённого входа");
-      return;
-    }
+    if (started || closed || ending) return;
+    if (!VoicePreflight.ready(
+        () -> new AccountStore(getContext()).load() != null,
+        () -> {
+          failed = true;
+          Toast.makeText(getContext(), "Войдите в TV GPT в настройках.", Toast.LENGTH_SHORT).show();
+          requestEnd();
+        })) return;
     if (VoicePreview.isActive()) {
       VoicePreview.stopActive(() -> ui.post(this::begin));
       return;

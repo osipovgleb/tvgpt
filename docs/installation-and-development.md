@@ -1,6 +1,6 @@
 # Разработка и установка TV GPT
 
-Перед изменениями прочитать [правила интерфейса](ui/interface-contract.md) и `AGENTS.md`. Пользовательские уточнения имеют приоритет над старым планом. Публичная публикация на GitHub разрешена пользователем. Контейнеры для разработки не требуются.
+Перед изменениями прочитать [правила интерфейса](ui/interface-contract.md) и `AGENTS.md`. Пользовательские уточнения имеют приоритет над старым планом. Репозиторий использует локальный Git; GitHub и контейнеры не требуются.
 
 ## Разработка
 
@@ -22,7 +22,6 @@ npm run quality
 
 AI Slop — dev-зависимость, не часть APK. Не выключать проверки ради оценки. Известные предупреждения о канонических подписочных URL объясняются; нельзя делать произвольный сервер для отправки токенов ради удаления предупреждения.
 
-Предпрослушивание голосов использует девять русских M4A, которые хранятся отдельно от репозитория: по умолчанию `~/.local/share/tvgpt/private-assets/voice-samples/`. Стартовый сигнал хранится рядом как `voice-start.ogg`. Переопределить каталог можно через `TVGPT_PRIVATE_ASSETS` (только вне репозитория). `scripts/prepare-assets.py` копирует публичные ресурсы и только эти десять дополнительных файлов в игнорируемый `build/assets/`; `aapt2` собирает APK из этой папки. Публичная сборка содержит собственный двухнотный `app/assets/voice-start.wav`, воспроизводимый генератором `scripts/generate-startup-cue.py`; внешний `voice-start.ogg` имеет приоритет только в личной сборке. Без локальных файлов образцы недоступны; предпрослушивание сообщает об отсутствии образца и не сохраняет новый голос. Скрипт ничего не скачивает. Для собственной сборки добавляйте только файлы, на использование которых у вас есть разрешение. При сборке они должны входить в APK без сжатия ZIP, чтобы MediaPlayer мог открыть asset по файловому дескриптору. SHA-256 и источники находятся в `sources.json`. Не возвращать подготовку через Live: для этих образцов не нужны сеть и микрофон. Проверка всех файлов и реального воспроизведения на ТВ: `adb -s TV_SERIAL shell am instrument -w -e mode bundled-voices local.tvgpt.assistant.tests/local.tvgpt.assistant.DeviceCheck` после сборки и установки тестового APK в разрешённом окне. Instrumentation перезапускает процесс приложения; не запускать её во время разговора.
 
 ## Обновление устройства — только когда разрешено
 
@@ -52,4 +51,32 @@ Google Katniss на этом TCL конкурирует за микрофон. �
 
 В release-отчёте указывать commit, локальные проверки, что реально проверено на ТВ, что осталось, и факт установки отдельно. Текущий статус — [app-sections-status.md](app-sections-status.md).
 
+## Дайджесты: фон, генерация и заставка
+
+Ветка реализации `codex/news-digests` добавляет самостоятельный Android-модуль: SQLite-конфигурация и очередь, JobScheduler/непробуждающий AlarmManager, news-only подписочный поиск, optional image_generation, gallery и DreamService. Настольный клиент не исполняет задания приложения. Imagegen не является условием работы: фотографии берутся из RSS/Atom/og:image исходных публикаций; без доступного изображения остаётся текст.
+
+Фон не использует историю разговоров, AppDataWork, аудиофокус или микрофон. Изменение настроек/удаление/logout проверяются ревизиями перед публикацией. При неизвестном результате генерация с тем же ключом не посылается повторно вслепую. Расписания восстанавливаются после boot/time/timezone/package replace; накопленные сроки объединяются. Android может задержать выполнение во сне/без сети; точное обновление в указанную минуту не гарантируется.
+
+Новый режим отдельного self-targeted data APK: `adb -s TV_SERIAL shell am instrument -w -e mode digests local.tvgpt.sectionschecks/local.tvgpt.assistant.DataCheck`. Только в разрешённом окне; затем удалить отдельный тестовый пакет. Это не проверка реального интернета или системной заставки.
+
+После разрешённой установки открыть «Дайджесты», создать тему и расписание, добавить HTTPS источник. Голосовые команды должны делать то же через общие команды. Подтвердить настоящий выпуск и фото fallback; генерацию считать доступной только после получения приложением декодируемого изображения. Подробности — `docs/imagegen-subscription-investigation.md`.
+
+В «Дайджестах» выбрать новостную заставку через системные настройки. Приложение не переписывает secure settings и не отключает пакеты Google/TCL. Если прошивка скрывает системный выбор стороннего DreamService, настройка компонента через разрешённое подключение допустима только в рамках явного поручения владельца заменить заставку, с сохранением прежнего значения и проверкой настоящего запуска. Это не действие автоматического обновления и не доказательство автозапуска. Отдельно наблюдать автозапуск, выход пультом, вызов помощника, standby/resume, офлайн-кеш и нагрузку ARM32. До этой проверки не заявлять замену заставки Google выполненной на устройстве.
+
 На TCL использовать только `--no-incremental`:18 октября системный DataLoader после успешного сообщения ADB завершился через `onSystemDataLoaderUnrecoverable`, удалил пакет и его данные. Не повторять инкрементальную установку. После обычного обновления проверить наличие пакета, сохранение UID, аккаунта и реальную привязку служб; Success сам по себе недостаточен.
+
+## Harness repair (18 October)
+
+Run the full test script, including test-data-repair.sh and test-tv-actions.sh. New pure suites cover current-call context, cancellation, task receipts and outcome evidence; HTTP tests abort the actual connection. Source-only and bytecode API31 checks do not prove TV audio compatibility. The user permits the existing Agent end_conversation tool; no canonical delegation phrase or additional speech model is used. Archive memory remains explicit only.
+
+Install only a named immutable source/APK snapshot from the latest six-section Digests worktree. Use streamed --no-incremental -r and preserve signing key, UID and account. Check idle usage first, then verify binding, ordinary first call, repeated calls/closing, HOME and the visible UI. Synthetic delegation injection tests exercise the executor path; they do not prove real Live intent delegation.
+
+## TCL: assistant stops after working for a while
+
+On18 October, exit-info recorded `tguard-kill` at14:09, followed by `TclAppBoot:forbid restart/bind service` for AssistantService/TvAccessibility/SessionService. The default assistant role was still set, but its process was gone. TCL-specific `APP_AUTO_START` and `APP_ASSOC_START` appops were `ignore`. This is distinct from a Live connection error or a microphone capture failure.
+
+The existing assistant handover and `scripts/connect-tv.py` now query these two operations, allow them only for `local.tvgpt.assistant` if supported, verify readback, and persist appops settings. Unsupported operations are skipped. Existing TCL Guard, other apps and global power policy stay unchanged. Original device values were both `ignore`; per-device rollback is `cmd appops set --user 0 local.tvgpt.assistant APP_AUTO_START ignore` and the corresponding APP_ASSOC_START command. Restoring those values reintroduces startup restrictions on this TCL.
+
+Successful readback and immediate invocation do not prove reboot persistence or immunity to future OEM kills. Observe idle/background operation and inspect `dumpsys activity exit-info local.tvgpt.assistant` before declaring long-term recovery verified.
+
+TCL Guard can still kill an allowed-to-start app. Its documented TGuardService --ma mKillWhiteList operation appends this package to the current runtime exemption list without changing other entries. Assistant setup queries support/membership and verifies the addition. AssistantService also makes one bounded background attempt per process start, using the existing paired local ADB connection. This list is not claimed permanent across Guard/TV restarts. If accessibility's window token is unavailable after rebind, the assistant catches BadTokenException, clears the failed overlay and uses its existing native system voice window. onUnbind invalidates the cached accessibility instance.

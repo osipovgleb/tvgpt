@@ -23,26 +23,24 @@ final class RemoteFocus {
   }
 
   static void begin(String direction) throws Exception {
-    FutureTask<Void> task =
-        new FutureTask<>(
-            () -> {
-              generation++;
-              if (TvAccessibility.current != null) {
-                if (direction.equals("home")) TvAccessibility.current.detachVoiceSessionForHome();
-                TvAccessibility.current.releaseAppFocus();
-              }
-              if (window != null) window.addFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE);
-              return null;
-            });
-    if (Looper.myLooper() == Looper.getMainLooper()) task.run();
-    else main.post(task);
-    try {
-      task.get(2, TimeUnit.SECONDS);
-    } catch (Exception e) {
-      task.cancel(false);
-      end();
-      throw e;
-    }
+    begin(direction, CancellationToken.NONE);
+  }
+
+  static void begin(String direction, CancellationToken token) throws Exception {
+    java.util.concurrent.Callable<Void> action =
+        () -> {
+          token.check();
+          generation++;
+          if (TvAccessibility.current != null) {
+            if (direction.equals("home")) TvAccessibility.current.detachVoiceSessionForHome();
+            token.check();
+            TvAccessibility.current.releaseAppFocus();
+          }
+          if (window != null) window.addFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE);
+          return null;
+        };
+    if (Looper.myLooper() == Looper.getMainLooper()) action.call();
+    else ActionDispatch.onQueue(main::post, action, token, 2000);
   }
 
   static void end() {
