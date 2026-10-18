@@ -1,3 +1,7 @@
-Startup cue: res/raw/listening_start_instant_0db.ogg from the official com.openai.chatgpt app installed on the development TV. OpenAI proprietary asset, used for this personal device prototype at the user request; no open-source license claimed. Extracted 2026-10-18.
+Public startup cue: voice-start.wav
+Original procedural two-note cue generated for TV GPT using scripts/generate-startup-cue.py. No third-party recording or melody was sampled. Mono PCM16, 48 kHz, 0.48 seconds.
 
-The binary is stored outside this source repository. Personal builds may stage it from TVGPT_PRIVATE_ASSETS/voice-start.ogg; it is excluded from public Git history.
+Permission is granted to use, copy, modify and redistribute this generated audio for any purpose, with or without attribution. The audio is provided without warranty. This permission covers the generated WAV and does not change the license status of the rest of the project.
+
+Personal builds: an optional external voice-start.ogg takes precedence over the public cue. The user's existing file remains unchanged outside the repository and is never published.
+Historical private source: res/raw/listening_start_instant_0db.ogg from the official com.openai.chatgpt app installed on the development TV. OpenAI proprietary asset, retained for this personal device prototype at user request; no open-source license claimed. Extracted 2026-10-18.

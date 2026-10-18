@@ -4,10 +4,18 @@ import android.content.Context;
 import android.media.*;
 
 final class SessionSounds {
+  private static android.content.res.AssetFileDescriptor startupSound(Context context)
+      throws java.io.IOException {
+    try {
+      return context.getAssets().openFd("voice-start.ogg");
+    } catch (java.io.FileNotFoundException absent) {
+      return context.getAssets().openFd("voice-start.wav");
+    }
+  }
+
   static void ready(Context context) {
     MediaPlayer player = new MediaPlayer();
-    try (android.content.res.AssetFileDescriptor source =
-        context.getAssets().openFd("voice-start.ogg")) {
+    try (android.content.res.AssetFileDescriptor source = startupSound(context)) {
       player.setAudioAttributes(
           new AudioAttributes.Builder()
               .setUsage(AudioAttributes.USAGE_ASSISTANT)
